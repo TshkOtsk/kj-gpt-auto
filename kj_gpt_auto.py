@@ -769,7 +769,8 @@ Please add philosophical criticism along the way.
 ### Condition:
 Please write in Japanese.
 Any additional explanations should be enclosed in parentheses.
-Please add a logical connection to the previous answer.
+Please add a logical connection to the last sentence of the text below.
+{answer}
 
 ###Input:
 # 未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要だ
@@ -785,6 +786,30 @@ Please add a logical connection to the previous answer.
 
 ###Input:
 """
+            simplified_answer = ""
+            simplifying_sentence = f"""
+### Instruction:
+{translated_theme}
+Extract the bracketed sentences from the text and create an integrated text of them.
+
+### Condition:
+Please write in Japanese.
+Please make sure that the text is chewed up in a way that high school students can understand.
+Please add a logical connection to the last sentence of the text below.
+{simplified_answer}
+
+###Input:
+宿題が多すぎて課題をこなすだけになっているのが嫌。（答えのある問題をただ強制的に解答させられるのは無駄だと思う。インターネットやChatGPTなどが急速に発展しているので、そういった単なる暗記や論理計算は、そのうち人間がやる必要はなくなると思う。それなのに、このまま偏差値至上主義の詰め込み教育で今後もやっていくならば、何の役にも立たない大人を育てることになるだろう。）
+そうではなくて、もっと未来の社会を発展させるような意味ある勉強がしたい。（答えのない問いに試行錯誤しながら立ち向かったり、自分だけの特別な興味関心を育てて専門性を高めたりする勉強の方が今後求められるのは明らかだ。）つまり、目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたいということ。そしてそのためには、子どもだけじゃなく大人の教育も必要だと思う。
+（そもそも今の教師が昔ながらの詰め込み式の教育で育ったので、その意識改革が必要だ。教師自身が答えのない自分の心の底から出てきた問いを設定し、生徒と一緒にそれに取り組む姿勢を見せないと、子供達はついていかない。それだけではなく、子供の親たちも新しい学びを人生に取り入れなければならない。答えのない探究活動は従来の学習に比べて、より日常生活に深く関わるものだ。普段過ごしている中で感じる疑問や違和感などを起点にした、実体験に即した問いであるほど、今後の長い人生で取り組むに値する深いものになりやすい。なので、これまでのように親が教育を学校や塾に任せっぱなしにして、家庭で子供に無関心でいては子供の探究心が育ちにくくなる。教師と同じように、親たちも自分の問いを立ててそれを追求する営みを実際にやるべきだ。そして、その行動が子供たちを感化させ、家庭を活気づかせて、さらには職場のパフォーマンスも上げることになるのが理想だ。）このように、未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要と言える。
+
+###Output:
+ただ問題の答えを教え込む古いやり方ではなく、なぜそうなるのかを考えたり、新しいことに挑戦したりする学びが大切だって話だよ。ネットやChatGPTみたいな賢いツールがたくさんあるから、単純な暗記や計算はもう人間がわざわざやることじゃなくなるんじゃないかな。でも、学校が今のまま詰め込みで点数だけ追いかける教育を続けたら、本当に必要なスキルを身につけられない大人になってしまうよ。
+これからは、答えがすぐには出ないような問題にどう立ち向かうか、自分の好きなことを見つけて深く掘り下げる学びが求められるんだ。先生たちも昔のやり方から変わって、生徒と一緒に考えることが大事だし、それは親も同じ。家での学びもすごく重要で、親が自分で疑問を持って考える姿を子供に見せることが、子供の好奇心を育てるんだ。
+つまり、学校や塾だけじゃなくて、家でも親が子供と一緒に新しいことにチャレンジしたり、考えたりすることが、子供の成長にとってはめちゃくちゃ大事ってわけ。そうすると、家の中ももっと楽しくなって、親の仕事のやる気にもつながるよ。
+
+###Input:
+"""
 
             converted_markdown = headline_to_list(markdown_text)
 
@@ -792,16 +817,28 @@ Please add a logical connection to the previous answer.
 
             segmented_markdown = segmented_by_three(markdown_text)
             combined_list = []
+            simplified_list = []
             for segment in segmented_markdown:
+
                 st.session_state.messages.append(SystemMessage(content=sentence))
                 st.session_state.messages.append(HumanMessage(content=segment))
                 with st.spinner("KJ-GPTが文章化しています ..."):
-                    answer, cost = get_answer(llm, st.session_state.messages[-3:])
+                    answer, cost = get_answer(llm, st.session_state.messages[-2:])
                 combined_list.append(answer)
                 st.session_state.messages.append(AIMessage(content=answer))
                 st.session_state.costs.append(cost)
+
+                st.session_state.messages.append(SystemMessage(content=simplifying_sentence))
+                st.session_state.messages.append(HumanMessage(content=answer))
+                with st.spinner("KJ-GPTが文章化しています ..."):
+                    simplified_answer, cost = get_answer(llm, st.session_state.messages[-2:])
+                simplified_list.append(simplified_answer)
+                st.session_state.messages.append(AIMessage(content=simplified_answer))
+
             combined_sentences = "\n".join(combined_list)
+            simplified_sentences = "\n".join(simplified_list)
             st.markdown(combined_sentences)
+            st.markdown(simplified_sentences)
 
             
 
