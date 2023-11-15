@@ -320,10 +320,10 @@ Please write in Japanese.
 
 labeling1 = """
 ###Instructions:
-If each group I entered has more than one item, please summarize those items in one concise sentence with a deeper meaning.
+Please summarize the items of groups in one concise sentence with a deeper meaning.
 
 ###Conditions:
-Use metaphors and proverbs as needed. Please write in Japanese.
+Please write in Japanese.
 
 ###Input:
 地元のご当地スイーツがあれば食べたい
@@ -360,10 +360,10 @@ Use metaphors and proverbs as needed. Please write in Japanese.
 
 labeling2 = """
 ###Instructions:
-If each group I entered has more than one item, please summarize those items in one concise sentence with a deeper meaning.
+Please summarize the items of groups in one concise sentence with a deeper meaning.
 
 ###Conditions:
-Use metaphors and proverbs as needed. Please write in Japanese.
+Please write in Japanese.
 
 ###Input:
 福島県のスイーツを活かした、ご当地スイーツが食べたい
@@ -395,10 +395,10 @@ Use metaphors and proverbs as needed. Please write in Japanese.
 
 labeling3 = """
 ###Instructions:
-If each group I entered has more than one item, please summarize those items in one concise sentence with a deeper meaning.
+Please summarize the items of groups in one concise sentence with a deeper meaning.
 
 ###Conditions:
-Use metaphors and proverbs as needed. Please write in Japanese.
+Please write in Japanese.
 
 ###Input:
 自然や果物、スイーツなどの強みを生かして、福島県を盛り上げたい
@@ -423,7 +423,7 @@ Use metaphors and proverbs as needed. Please write in Japanese.
 
 labeling4 = """
 ###Instructions:
-If each group I entered has more than one item, please summarize those items in one concise sentence with a deeper meaning.
+Please summarize the items of groups in one concise sentence with a deeper meaning.
 
 ###Conditions:
 Use metaphors and proverbs as needed. Please write in Japanese.
@@ -446,7 +446,7 @@ Use metaphors and proverbs as needed. Please write in Japanese.
 
 labeling5 = """
 ###Instructions:
-If each group I entered has more than one item, please summarize those items in one concise sentence with a deeper meaning.
+Please summarize the items of groups in one concise sentence with a deeper meaning.
 
 ###Conditions:
 Use metaphors and proverbs as needed. Please write in Japanese.
@@ -469,7 +469,7 @@ Use metaphors and proverbs as needed. Please write in Japanese.
 symbol = """
 ###Instructions:
 Paraphrase each group of sentences in a single word that can be understood instantaneously.
-Rephrase it with a verb, adjective, noun or phrase in Japanese.
+Rephrase it with an adjective, verb or metaphor in Japanese.
 
 ###Input:
 その土地土地が持つ歴史や自然環境、食文化や雰囲気などを、自分から楽しみ、そして広めたい
@@ -550,7 +550,6 @@ def count_newlines(text):
 
 def get_init_list(data):
     lines = data.strip().split("\n")
-    print(lines)
     return lines
 
 def get_list(data):
@@ -561,15 +560,16 @@ def get_list(data):
     temp = []
 
     for line in lines:
-        # ”グループ”の行の場合、tempをリセット
-        if "グループ" in line:
+        # ”グループ”もしくは"単独"の行の場合、tempをリセット
+        if "グループ" in line or "単独" in line:
             if temp:
                 if len(temp) == 1:
                     result.append(temp[0])
                 else:
                     result.append(temp)
                 temp = []
-        else:
+        # 行にデータがある場合のみ追加
+        elif line:
             temp.append(line)
     # 最後のグループのデータを追加
     if temp:
@@ -608,18 +608,23 @@ def headline_to_list(markdown_input):
 
     # 各行をループして処理します。
     for line in lines:
-        # 見出しのレベルを決定します（#の数で決まります）。
-        level = line.count("#")
-        
-        # 見出しのテキストを抽出します。
-        text = line.replace("#", "").strip()
-        
-        # リストアイテムのインデントを決定します。
-        # インデントは見出しレベルに応じて増やします。
-        indent = '    ' * (level - 1)
-        
-        # 変換されたリストアイテムを追加します。
-        converted_list.append(f"{indent}- {text}")
+
+        if "**" in line:
+            converted_list.append("\n" + line + "\n")
+
+        else:
+            # 見出しのレベルを決定します（#の数で決まります）。
+            level = line.count("#")
+            
+            # 見出しのテキストを抽出します。
+            text = line.replace("#", "").strip()
+            
+            # リストアイテムのインデントを決定します。
+            # インデントは見出しレベルに応じて増やします。
+            indent = '    ' * (level - 1)
+            
+            # 変換されたリストアイテムを追加します。
+            converted_list.append(f"{indent}- {text}")
 
     # リスト形式に変換されたマークダウンを結合して出力します。
     converted_markdown = "\n".join(converted_list)
@@ -734,23 +739,28 @@ def main():
                 number_of_items = len(group_list)
             # symbol_input_list = get_list(user_input)
             # print("symbol_input_list:", symbol_input_list)
-            print(group_list)
             top_items = []
+            symbol_sets = []
+            symbol_dict = {}
+            symbol_count = 0
             for item in group_list:
+                symbol_count += 1
                 item_str = str(item)
                 st.session_state.messages.append(SystemMessage(content=symbol))
                 st.session_state.messages.append(HumanMessage(content=item_str))
                 with st.spinner("KJ-GPTがシンボルを作成しています ..."):
-                    answer, cost = get_answer(llm, st.session_state.messages[-2:])
-                # symbol_set = answer + "：" + item_str
+                    symbol_answer, cost = get_answer(llm, st.session_state.messages[-2:])
+                symbol_set = symbol_answer + "：" + item_str
+                symbol_title = "**" + f"({symbol_count}) " +  symbol_answer + "**"
+                symbol_dict["# " + item_str] = symbol_title + "\n" + "# " + item_str
                 # print("symbol_set", symbol_set)
                 top_items.append(item_str)
+                symbol_sets.append(symbol_set)
                 st.session_state.messages.append(AIMessage(content=answer))
                 st.session_state.costs.append(cost)
-            symbol_str = "\n".join(top_items)
-            st.text_area(label="結果: ", value=symbol_str, key="final_result", height=300)
+            symbol_str = "\n".join(symbol_sets)
+            st.text_area(label="シンボル: ", value=symbol_str, key="final_result", height=300)
             st.text_area(label="辞書: ", value=labeling_pair, key="final_dict", height=300)
-            print(top_items)
 
             markdown_text = ""
 
@@ -759,7 +769,42 @@ def main():
                 # top_text = top_item.split("：")[1].strip()
                 markdown_text += add_markdown_entry(1, top_item)  # 最上位の見出しを追加
                 markdown_text += find_sub_items(top_item, 2, labeling_pair)  # サブアイテムを探して追加
+            for key, value in symbol_dict.items():
+                markdown_text = markdown_text.replace(key, value)
+            
+            st.text_area(label="Mark down: ", value=markdown_text, key="markdown", height=450)
 
+
+#             sentence = f"""
+# ###Instructions:
+# {translated_theme}
+# You are a philosopher who excels at introspection. Please logically connect each of the following bulleted items into a sentence.
+# Please add philosophical criticism along the way.
+
+# ### Condition:
+# Please write in Japanese.
+# Any additional explanations should be enclosed in parentheses.
+# The line beginning with "**" is the title of the chapter, so insert a line break before and after it.
+# Please add a logical connection to the last sentence of the text below.
+# {answer}
+
+# ###Input:
+# # 未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要だ
+# ## 子どもだけじゃなく大人の教育も必要だと思う
+# ## 目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたい
+# ### 宿題が多すぎて課題をこなすだけになっているのが嫌
+# ### 未来の社会を発展させるような意味ある勉強がしたい
+
+# ###Output:
+# 宿題が多すぎて課題をこなすだけになっているのが嫌。（答えのある問題をただ強制的に解答させられるのは無駄だと思う。インターネットやChatGPTなどが急速に発展しているので、そういった単なる暗記や論理計算は、そのうち人間がやる必要はなくなると思う。それなのに、このまま偏差値至上主義の詰め込み教育で今後もやっていくならば、何の役にも立たない大人を育てることになるだろう。）
+# そうではなくて、もっと未来の社会を発展させるような意味ある勉強がしたい。（答えのない問いに試行錯誤しながら立ち向かったり、自分だけの特別な興味関心を育てて専門性を高めたりする勉強の方が今後求められるのは明らかだ。）つまり、目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたいということ。そしてそのためには、子どもだけじゃなく大人の教育も必要だと思う。
+# （そもそも今の教師が昔ながらの詰め込み式の教育で育ったので、その意識改革が必要だ。教師自身が答えのない自分の心の底から出てきた問いを設定し、生徒と一緒にそれに取り組む姿勢を見せないと、子供達はついていかない。それだけではなく、子供の親たちも新しい学びを人生に取り入れなければならない。答えのない探究活動は従来の学習に比べて、より日常生活に深く関わるものだ。普段過ごしている中で感じる疑問や違和感などを起点にした、実体験に即した問いであるほど、今後の長い人生で取り組むに値する深いものになりやすい。なので、これまでのように親が教育を学校や塾に任せっぱなしにして、家庭で子供に無関心でいては子供の探究心が育ちにくくなる。教師と同じように、親たちも自分の問いを立ててそれを追求する営みを実際にやるべきだ。そして、その行動が子供たちを感化させ、家庭を活気づかせて、さらには職場のパフォーマンスも上げることになるのが理想だ。）このように、未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要と言える。
+
+# ###Input:
+# """
+
+            # 変数answerをリセット
+            answer = ""
             sentence = f"""
 ###Instructions:
 {translated_theme}
@@ -769,10 +814,12 @@ Please add philosophical criticism along the way.
 ### Condition:
 Please write in Japanese.
 Any additional explanations should be enclosed in parentheses.
+The line beginning with "**" is the title of the chapter, so insert a line break before and after it.
 Please add a logical connection to the last sentence of the text below.
 {answer}
 
 ###Input:
+**(1) 常識はずれの大切な行動**
 # 未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要だ
 ## 子どもだけじゃなく大人の教育も必要だと思う
 ## 目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたい
@@ -780,12 +827,16 @@ Please add a logical connection to the last sentence of the text below.
 ### 未来の社会を発展させるような意味ある勉強がしたい
 
 ###Output:
+
+(1) 常識はずれの大切な行動
+
 宿題が多すぎて課題をこなすだけになっているのが嫌。（答えのある問題をただ強制的に解答させられるのは無駄だと思う。インターネットやChatGPTなどが急速に発展しているので、そういった単なる暗記や論理計算は、そのうち人間がやる必要はなくなると思う。それなのに、このまま偏差値至上主義の詰め込み教育で今後もやっていくならば、何の役にも立たない大人を育てることになるだろう。）
 そうではなくて、もっと未来の社会を発展させるような意味ある勉強がしたい。（答えのない問いに試行錯誤しながら立ち向かったり、自分だけの特別な興味関心を育てて専門性を高めたりする勉強の方が今後求められるのは明らかだ。）つまり、目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたいということ。そしてそのためには、子どもだけじゃなく大人の教育も必要だと思う。
 （そもそも今の教師が昔ながらの詰め込み式の教育で育ったので、その意識改革が必要だ。教師自身が答えのない自分の心の底から出てきた問いを設定し、生徒と一緒にそれに取り組む姿勢を見せないと、子供達はついていかない。それだけではなく、子供の親たちも新しい学びを人生に取り入れなければならない。答えのない探究活動は従来の学習に比べて、より日常生活に深く関わるものだ。普段過ごしている中で感じる疑問や違和感などを起点にした、実体験に即した問いであるほど、今後の長い人生で取り組むに値する深いものになりやすい。なので、これまでのように親が教育を学校や塾に任せっぱなしにして、家庭で子供に無関心でいては子供の探究心が育ちにくくなる。教師と同じように、親たちも自分の問いを立ててそれを追求する営みを実際にやるべきだ。そして、その行動が子供たちを感化させ、家庭を活気づかせて、さらには職場のパフォーマンスも上げることになるのが理想だ。）このように、未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要と言える。
 
 ###Input:
 """
+            
             simplified_answer = ""
             simplifying_sentence = f"""
 ### Instruction:
@@ -795,18 +846,46 @@ Extract the bracketed sentences from the text and create an integrated text of t
 ### Condition:
 Please write in Japanese.
 Please make sure that the text is chewed up in a way that high school students can understand.
-Please add a logical connection to the last sentence of the text below.
+Lines beginning with bracketed numbers should be transcribed in their original position and with no change in content.
+Please add a logical connection to the text below.
 {simplified_answer}
 
 ###Input:
+(1) 常識はずれの大切な行動
+
 宿題が多すぎて課題をこなすだけになっているのが嫌。（答えのある問題をただ強制的に解答させられるのは無駄だと思う。インターネットやChatGPTなどが急速に発展しているので、そういった単なる暗記や論理計算は、そのうち人間がやる必要はなくなると思う。それなのに、このまま偏差値至上主義の詰め込み教育で今後もやっていくならば、何の役にも立たない大人を育てることになるだろう。）
 そうではなくて、もっと未来の社会を発展させるような意味ある勉強がしたい。（答えのない問いに試行錯誤しながら立ち向かったり、自分だけの特別な興味関心を育てて専門性を高めたりする勉強の方が今後求められるのは明らかだ。）つまり、目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたいということ。そしてそのためには、子どもだけじゃなく大人の教育も必要だと思う。
 （そもそも今の教師が昔ながらの詰め込み式の教育で育ったので、その意識改革が必要だ。教師自身が答えのない自分の心の底から出てきた問いを設定し、生徒と一緒にそれに取り組む姿勢を見せないと、子供達はついていかない。それだけではなく、子供の親たちも新しい学びを人生に取り入れなければならない。答えのない探究活動は従来の学習に比べて、より日常生活に深く関わるものだ。普段過ごしている中で感じる疑問や違和感などを起点にした、実体験に即した問いであるほど、今後の長い人生で取り組むに値する深いものになりやすい。なので、これまでのように親が教育を学校や塾に任せっぱなしにして、家庭で子供に無関心でいては子供の探究心が育ちにくくなる。教師と同じように、親たちも自分の問いを立ててそれを追求する営みを実際にやるべきだ。そして、その行動が子供たちを感化させ、家庭を活気づかせて、さらには職場のパフォーマンスも上げることになるのが理想だ。）このように、未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要と言える。
 
 ###Output:
+(1) 常識はずれの大切な行動
+
+ただ問題の答えを教え込む古いやり方ではなく、なぜそうなるのかを考えたり、新しいことに挑戦したりする学びが大切だって話だよ。ネットやChatGPTみたいな賢いツールがたくさんあるから、単純な暗記や計算はもう人間がわざわざやることじゃなくなるんじゃないかな。でも、学校が今のまま詰め込みで点数だけ追いかける教育を続けたら、本当に必要なスキルを身につけられない大人になってしまう。
+これからは、答えがすぐには出ないような問題にどう立ち向かうか、自分の好きなことを見つけて深く掘り下げる学びが求められるんだ。先生たちも昔のやり方から変わって、生徒と一緒に考えることが大事だし、それは親も同じ。家での学びもすごく重要で、親が自分で疑問を持って考える姿を子供に見せることが、子供の好奇心を育てるんだ。
+つまり、学校や塾だけじゃなくて、家でも親が子供と一緒に新しいことにチャレンジしたり、考えたりすることが、子供の成長にとってはめちゃくちゃ大事ってわけ。そうすると、家の中ももっと楽しくなって、親の仕事のやる気にもつながるんだ。
+
+###Input:
+"""
+            
+            summarized_answer = ""
+            summarized_sentence = f"""
+### Instruction:
+{translated_theme}
+Briefly summarize the following sentences in one sentence.
+
+### Condition:
+Please write in Japanese.
+Please make sure that the text is chewed up in a way that high school students can understand.
+Please add a logical connection and a conjunction to the the text below.
+{summarized_answer}
+
+###Input:
 ただ問題の答えを教え込む古いやり方ではなく、なぜそうなるのかを考えたり、新しいことに挑戦したりする学びが大切だって話だよ。ネットやChatGPTみたいな賢いツールがたくさんあるから、単純な暗記や計算はもう人間がわざわざやることじゃなくなるんじゃないかな。でも、学校が今のまま詰め込みで点数だけ追いかける教育を続けたら、本当に必要なスキルを身につけられない大人になってしまうよ。
 これからは、答えがすぐには出ないような問題にどう立ち向かうか、自分の好きなことを見つけて深く掘り下げる学びが求められるんだ。先生たちも昔のやり方から変わって、生徒と一緒に考えることが大事だし、それは親も同じ。家での学びもすごく重要で、親が自分で疑問を持って考える姿を子供に見せることが、子供の好奇心を育てるんだ。
 つまり、学校や塾だけじゃなくて、家でも親が子供と一緒に新しいことにチャレンジしたり、考えたりすることが、子供の成長にとってはめちゃくちゃ大事ってわけ。そうすると、家の中ももっと楽しくなって、親の仕事のやる気にもつながるよ。
+
+###Output:
+いまの時代は、単純な暗記よりも考える力や新しいことに挑戦する力を育てる学びが大切なんだ。そして、家庭でも親が子供と一緒に学ぶことができれば、子供だけじゃなくて親の成長にもつながるってわけ。
 
 ###Input:
 """
@@ -818,12 +897,17 @@ Please add a logical connection to the last sentence of the text below.
             segmented_markdown = segmented_by_three(markdown_text)
             combined_list = []
             simplified_list = []
+            summarized_list = []
+
             for segment in segmented_markdown:
 
                 st.session_state.messages.append(SystemMessage(content=sentence))
                 st.session_state.messages.append(HumanMessage(content=segment))
                 with st.spinner("KJ-GPTが文章化しています ..."):
                     answer, cost = get_answer(llm, st.session_state.messages[-2:])
+                # もし答えが(1)などで始まっていたら、その前に改行を追加
+                if answer.startswith("("):
+                    answer = "\n" + answer
                 combined_list.append(answer)
                 st.session_state.messages.append(AIMessage(content=answer))
                 st.session_state.costs.append(cost)
@@ -832,13 +916,25 @@ Please add a logical connection to the last sentence of the text below.
                 st.session_state.messages.append(HumanMessage(content=answer))
                 with st.spinner("KJ-GPTが文章化しています ..."):
                     simplified_answer, cost = get_answer(llm, st.session_state.messages[-2:])
+                # もし答えが(1)などで始まっていたら、その前に改行を追加
+                if simplified_answer.startswith("("):
+                    simplified_answer = "\n" + simplified_answer
                 simplified_list.append(simplified_answer)
                 st.session_state.messages.append(AIMessage(content=simplified_answer))
 
+            #     st.session_state.messages.append(SystemMessage(content=summarized_sentence))
+            #     st.session_state.messages.append(HumanMessage(content=simplified_answer))
+            #     with st.spinner("KJ-GPTが文章化しています ..."):
+            #         summarized_answer, cost = get_answer(llm, st.session_state.messages[-2:])
+            #     summarized_list.append(summarized_answer)
+            #     st.session_state.messages.append(AIMessage(content=summarized_answer))
+
             combined_sentences = "\n".join(combined_list)
             simplified_sentences = "\n".join(simplified_list)
+            # summarized_sentences = "\n".join(summarized_list)
             st.markdown(combined_sentences)
             st.markdown(simplified_sentences)
+            # st.markdown(summarized_sentences)
 
             
 
