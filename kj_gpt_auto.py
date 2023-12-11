@@ -1284,7 +1284,7 @@ def main():
 
     # OpenAI API Keyの入力
     with st.form("my_api_key", clear_on_submit=True):
-        openai_api_key = st.text_input("OpenAI API Key", type="password", placeholder="OpenAI API Key を入力してください")
+        openai_api_key = st.text_input("OpenAI API Key", type="password")
         api_key_button = st.form_submit_button(label="完了")
     
         if api_key_button and openai_api_key:
@@ -1336,7 +1336,7 @@ def main():
             while number_of_items > 5:
                 # lines = count_newlines(user_input)
                 if translated_theme is None:
-                    translated_theme = theme_translate(user_theme)
+                    translated_theme = theme_translate(user_theme,st.session_state["openai_api_key"])
                 prompt_ptrn = prompt_grouping(number_of_items, translated_theme)
                 st.session_state.messages.append(SystemMessage(content=prompt_ptrn))
                 st.session_state.messages.append(HumanMessage(content=user_input))
