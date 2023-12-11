@@ -307,7 +307,7 @@ Items with conflicting content should be grouped separately.
     return prompt_ptrn
 
 def theme_translate(user_theme):
-    theme = "インプットフィールドに入力したのは、" + user_theme + "についてのデータです。"
+    theme = "ユーザーが入力するのは、" + user_theme + "についてのデータです。"
     llm = ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo-0613")
     translating_prompt = f"""
 Please translate the following Japanese sentence into English.
@@ -1283,6 +1283,14 @@ def messages_init():
 
 def main():
     init_page()
+
+    if not OPENAI_API_KEY:
+        st.text_input(
+            "OpenAI API Key",
+            key="openai_api_key",
+            type="password",
+            placeholder="※ OpenAI API Key を入力してください。",
+        )
 
     llm = select_model()
     init_messages()
