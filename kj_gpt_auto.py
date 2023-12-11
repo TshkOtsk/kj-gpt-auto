@@ -1,4 +1,4 @@
-# from logging import basicConfig
+from logging import basicConfig
 from urllib import response
 import streamlit as st
 from langchain.chat_models import ChatOpenAI
@@ -22,8 +22,7 @@ import faiss
 
 theme = ""
 prompt_ptrn = ""
-api_key = ""
-
+openai_api_key = ""
 
 # 例示データの出典
 # 「何となく気になる興味関心について」
@@ -306,7 +305,7 @@ Items with conflicting content should be grouped separately.
 
 def theme_translate(user_theme):
     theme = "ユーザーが入力するのは、" + user_theme + "についてのデータです。"
-    llm = ChatOpenAI(api_key=api_key, temperature=0, model_name="gpt-3.5-turbo-0613")
+    llm = ChatOpenAI(api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-0613")
     translating_prompt = f"""
 Please translate the following Japanese sentence into English.
 {theme}
@@ -320,7 +319,7 @@ Please translate the following Japanese sentence into English.
     return translated_theme
 
 def eng_translates(text):
-    llm = ChatOpenAI(api_key=api_key, temperature=0, model_name="gpt-3.5-turbo-16k-0613")
+    llm = ChatOpenAI(api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-16k-0613")
     translating_prompt = f"""
 Please translate the following Japanese sentence into English.
 {text}
@@ -333,7 +332,7 @@ Please translate the following Japanese sentence into English.
     return translated_text
 
 def summarize(text):
-    llm = ChatOpenAI(api_key=api_key, temperature=0.7, model_name="gpt-4-1106-preview")
+    llm = ChatOpenAI(api_key=openai_api_key, temperature=0.7, model_name="gpt-4-1106-preview")
     translating_prompt = f"""
 ### Instruction:
 Act as an introspective person who excels at looking deep into his or her own mind.
@@ -362,7 +361,7 @@ Please write in Japanese.
 
 def data_generating(user_theme):
     theme = user_theme
-    llm = ChatOpenAI(api_key=api_key, temperature=0, model_name="gpt-3.5-turbo-0613")
+    llm = ChatOpenAI(api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-0613")
     translating_prompt = f"""
 Please translate the following Japanese sentence into English.
 {theme}
@@ -801,7 +800,7 @@ def select_model():
     # 初期値は0.0、刻み幅は0.1とする
     temperature = st.sidebar.slider("Temperature:", min_value=0.0, max_value=1.0, value=0.7, step=0.01)
     
-    return ChatOpenAI(api_key=api_key, temperature=temperature, model_name=model_name)
+    return ChatOpenAI(api_key=openai_api_key, temperature=temperature, model_name=model_name)
 
 def get_answer(llm, messages):
     with get_openai_callback() as cb:
@@ -1283,9 +1282,10 @@ def main():
     init_page()
 
     # OpenAI API Keyの入力
-    api_key = st.text_input("OpenAI API Key", type="password")
+    openai_api_key = st.text_input("OpenAI API Key", type="password")
 
-    llm = select_model()
+    if openai_api_key:
+        llm = select_model()
     init_messages()
 
     translated_theme = None
