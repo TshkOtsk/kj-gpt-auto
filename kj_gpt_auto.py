@@ -1283,9 +1283,11 @@ def main():
     init_page()
 
     # OpenAI API Keyの入力
-    with st.form(key="my_api_key", clear_on_submit=True):
-        openai_api_key = st.text_input("OpenAI API Key", type="password", placeholder="OpenAI API Key を入力してください")
-        api_key_button = st.form_submit_button(label="完了")
+    api_key_container = st.container()
+    with api_key_container:
+        with st.form(key="my_api_key", clear_on_submit=True):
+            openai_api_key = st.text_input("OpenAI API Key", type="password", placeholder="OpenAI API Key を入力してください")
+            api_key_button = st.form_submit_button(label="完了")
     
     if api_key_button and openai_api_key:
         st.session_state["openai_api_key"] = openai_api_key
@@ -1308,7 +1310,7 @@ def main():
 
     container = st.container()
     with container:
-        with st.form(key="my_grouping", clear_on_submit=False):
+        with st.form(key="my_form", clear_on_submit=False):
             user_input = st.text_area(label="項目ラベル: ", key="input", height=300)
             
             # generating_button = st.form_submit_button(label="項目自動生成")
