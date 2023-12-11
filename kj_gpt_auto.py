@@ -800,7 +800,7 @@ def select_model():
     # 初期値は0.0、刻み幅は0.1とする
     temperature = st.sidebar.slider("Temperature:", min_value=0.0, max_value=1.0, value=0.7, step=0.01)
     
-    return ChatOpenAI(api_key=openai_api_key, temperature=temperature, model_name=model_name)
+    return ChatOpenAI(openai_api_key=openai_api_key, temperature=temperature, model_name=model_name)
 
 def get_answer(llm, messages):
     with get_openai_callback() as cb:
