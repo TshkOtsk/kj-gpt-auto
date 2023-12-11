@@ -755,7 +755,6 @@ def init_page():
     )
     st.header("KJ-GPT 🕵️‍♂️")
     st.sidebar.title("Options")
-    openai_api_key = ""
 
 def init_messages():
     clear_button = st.sidebar.button("Clear Conversation", key="clear")
