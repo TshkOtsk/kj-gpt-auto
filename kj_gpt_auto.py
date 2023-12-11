@@ -755,6 +755,7 @@ def init_page():
     )
     st.header("KJ-GPT 🕵️‍♂️")
     st.sidebar.title("Options")
+    openai_api_key = ""
 
 def init_messages():
     clear_button = st.sidebar.button("Clear Conversation", key="clear")
@@ -1289,6 +1290,7 @@ def main():
     
         if api_key_button and openai_api_key:
             st.session_state["openai_api_key"] = openai_api_key
+    
     if openai_api_key:
         llm = select_model(openai_api_key)
     init_messages()
