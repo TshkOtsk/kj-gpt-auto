@@ -1308,7 +1308,7 @@ def main():
 
     container = st.container()
     with container:
-        with st.form(key="my_form", clear_on_submit=False):
+        with st.form(key="my_grouping", clear_on_submit=False):
             user_input = st.text_area(label="項目ラベル: ", key="input", height=300)
             
             # generating_button = st.form_submit_button(label="項目自動生成")
