@@ -1272,7 +1272,7 @@ Please include three or four of the following emojis in the text in any combinat
     st.session_state.costs.append(cost)
     return answer
 
-@st.cache_data
+@st.cache_resource
 def load_wiki():
     # wikipedia 日本語データセットのロード
     wikija_dataset = load_dataset(
