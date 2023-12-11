@@ -1291,8 +1291,9 @@ def main():
     
         if api_key_button and openai_api_key:
             st.session_state["openai_api_key"] = openai_api_key
-            llm = select_model(st.session_state["openai_api_key"])
-
+    
+    if openai_api_key:
+        llm = select_model(st.session_state["openai_api_key"])
     translated_theme = None
 
     # ユーザーの入力を監視
