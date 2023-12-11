@@ -1291,6 +1291,8 @@ def main():
             type="password",
             placeholder="※ OpenAI API Key を入力してください。",
         )
+    else:
+        st.session_state.openai_api_key = OPENAI_API_KEY
 
     llm = select_model()
     init_messages()
