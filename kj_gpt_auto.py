@@ -1289,7 +1289,6 @@ def main():
         type="password",
         placeholder="※ OpenAI API Key を入力してください。",
     )
-    api_key = st.text_input("OpenAI API Key", type="password")
 
     llm = select_model()
     init_messages()
