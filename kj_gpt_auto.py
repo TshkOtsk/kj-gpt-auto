@@ -304,7 +304,7 @@ Items with conflicting content should be grouped separately.
 
 def theme_translate(user_theme,openai_api_key):
     theme = "ユーザーが入力するのは、" + user_theme + "についてのデータです。"
-    llm = ChatOpenAI(api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-0613")
+    llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-0613")
     translating_prompt = f"""
 Please translate the following Japanese sentence into English.
 {theme}
@@ -318,7 +318,7 @@ Please translate the following Japanese sentence into English.
     return translated_theme
 
 def eng_translates(text,openai_api_key):
-    llm = ChatOpenAI(api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-16k-0613")
+    llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-16k-0613")
     translating_prompt = f"""
 Please translate the following Japanese sentence into English.
 {text}
@@ -331,7 +331,7 @@ Please translate the following Japanese sentence into English.
     return translated_text
 
 def summarize(text,openai_api_key):
-    llm = ChatOpenAI(api_key=openai_api_key, temperature=0.7, model_name="gpt-4-1106-preview")
+    llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.7, model_name="gpt-4-1106-preview")
     translating_prompt = f"""
 ### Instruction:
 Act as an introspective person who excels at looking deep into his or her own mind.
@@ -360,7 +360,7 @@ Please write in Japanese.
 
 def data_generating(user_theme,openai_api_key):
     theme = user_theme
-    llm = ChatOpenAI(api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-0613")
+    llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-0613")
     translating_prompt = f"""
 Please translate the following Japanese sentence into English.
 {theme}
@@ -774,6 +774,8 @@ def init_messages():
 
         st.session_state.costs = []
 
+        st.session_state["openai_api_key"] = ""
+
         st.session_state["markdown_text"] = ""
 
         st.session_state["user_theme"] = ""
@@ -794,9 +796,7 @@ def select_model(openai_api_key):
         model_name = "gpt-4"
     else:
         model_name = "gpt-4-1106-preview"
-
-    print("openai_api_keyの値は、", openai_api_key)
-
+    
     # サイドバーにスライダーを追加し、temperatureを0から1までの範囲で選択可能にする
     # 初期値は0.0、刻み幅は0.1とする
     temperature = st.sidebar.slider("Temperature:", min_value=0.0, max_value=1.0, value=0.7, step=0.01)
@@ -1283,9 +1283,12 @@ def main():
     init_page()
 
     # OpenAI API Keyの入力
-    openai_api_key = st.text_input("OpenAI API Key", type="password")
+    with st.form(key="my_form", clear_on_submit=True):
+        openai_api_key = st.text_input("OpenAI API Key", type="password", placeholder="OpenAI API Key を入力してください")
+        api_key_button = st.form_submit_button(label="完了")
     
-    if openai_api_key:
+    if api_key_button and openai_api_key:
+        st.session_state["openai_api_key"] = openai_api_key
         llm = select_model(openai_api_key)
     init_messages()
 
@@ -1300,7 +1303,7 @@ def main():
             theme_button = st.form_submit_button(label="決定")
         if theme_button and user_theme:
             st.session_state["user_theme"] = user_theme
-            translated_theme = theme_translate(user_theme,openai_api_key)
+            translated_theme = theme_translate(user_theme,st.session_state["openai_api_key"])
 
 
     container = st.container()
@@ -1314,7 +1317,7 @@ def main():
             # symbol_button = st.form_submit_button(label="シンボル作成")
 
         # if generating_button and user_theme:
-        #     prompt_ptrn = data_generating(user_theme,openai_api_key)
+        #     prompt_ptrn = data_generating(user_theme,st.session_state["openai_api_key"])
         #     st.session_state.messages.append(SystemMessage(content=prompt_ptrn))
         #     st.session_state.messages.append(HumanMessage(content=user_input))
         #     with st.spinner("KJ-GPTが元データを生成しています ..."):
@@ -1565,7 +1568,7 @@ Please add a logical connection and a conjunction to the the text below.
                 for group in basic_data_for_abduction:
                     print("basic_data_for_abductionのグループ：", group)
                     # sentence_generatingで文章化し、返し値の要約文をjust_before_answer_summarizedに格納
-                    just_before_answer_summarized = sentence_generating(llm,group,st.session_state["translated_theme"],summarized_list,sentence_generating)
+                    just_before_answer_summarized = sentence_generating(llm,group,st.session_state["translated_theme"],summarized_list,st.session_state["openai_api_key"])
                     summarized_list.append(just_before_answer_summarized)
 
                 # print("1240行目のsummarized_list：", summarized_list)
