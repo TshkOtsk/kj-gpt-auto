@@ -1288,10 +1288,9 @@ def main():
         api_key_button = st.form_submit_button(label="Enter")
     
         if api_key_button and openai_api_key:
-            llm = select_model(openai_api_key)
             init_messages()
-            
-    st.session_state["openai_api_key"] = openai_api_key
+            st.session_state["openai_api_key"] = openai_api_key
+            llm = select_model(st.session_state["openai_api_key"])
 
     translated_theme = None
 
