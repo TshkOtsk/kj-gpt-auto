@@ -795,6 +795,8 @@ def select_model(openai_api_key):
     else:
         model_name = "gpt-4-1106-preview"
 
+    print("openai_api_keyの値は、", openai_api_key)
+
     # サイドバーにスライダーを追加し、temperatureを0から1までの範囲で選択可能にする
     # 初期値は0.0、刻み幅は0.1とする
     temperature = st.sidebar.slider("Temperature:", min_value=0.0, max_value=1.0, value=0.7, step=0.01)
