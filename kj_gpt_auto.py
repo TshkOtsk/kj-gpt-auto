@@ -1283,7 +1283,7 @@ def main():
     init_page()
 
     # OpenAI API Keyの入力
-    with st.form(key="my_form", clear_on_submit=True):
+    with st.form(key="my_api_key", clear_on_submit=True):
         openai_api_key = st.text_input("OpenAI API Key", type="password", placeholder="OpenAI API Key を入力してください")
         api_key_button = st.form_submit_button(label="完了")
     
