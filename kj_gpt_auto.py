@@ -1436,6 +1436,8 @@ def main():
     sentence_container = st.container()
     with sentence_container:
         with st.form(key="my_sentence", clear_on_submit=False):
+            if "markdown_text" not in st.session_state:
+                st.session_state["markdown_text"] = ""
             layered_data = st.text_area(label="階層化データ: ", key="layered_data", value=st.session_state["markdown_text"], height=300)
             sentence_button = st.form_submit_button(label="データを文章化")
         if sentence_button and layered_data:
