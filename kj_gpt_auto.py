@@ -1282,7 +1282,11 @@ def main():
     init_page()
 
     # OpenAI API Keyの入力
-    openai_api_key = st.text_input("OpenAI API Key", type="password")
+    openai_api_key = st.text_input(
+            "OpenAI API Key",
+            type="password",
+            placeholder="※ OpenAI API Key を入力してください",
+        )
 
     if openai_api_key:
         llm = select_model()
