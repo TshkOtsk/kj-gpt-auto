@@ -1272,6 +1272,7 @@ Please include three or four of the following emojis in the text in any combinat
     st.session_state.costs.append(cost)
     return answer
 
+@st.experimental_memo
 def load_wiki():
     # wikipedia 日本語データセットのロード
     wikija_dataset = load_dataset(
@@ -1645,23 +1646,8 @@ Please add a logical connection and a conjunction to the the text below.
                     del split_sentences[i]
 
             with st.spinner("探偵事務所に問い合わせ中 ..."):
-                # wikipedia 日本語データセットのロード
-                wikija_dataset = load_dataset(
-                    path="singletongue/wikipedia-utils",
-                    name="passages-c400-jawiki-20230403",
-                    split="train",
-                )
-                # faiss index のダウンロード
-                dm = DownloadManager()
-                index_local_path = dm.download(
-                    f"https://huggingface.co/datasets/hotchpotch/wikipedia-passages-jawiki-embeddings/resolve/main/faiss_indexes/passages-c400-jawiki-20230403/sup-simcse-ja-base/index_IVF2048_PQ192.faiss"
-                )
-                # faiss index のロード
-                faiss_index = faiss.read_index(index_local_path)
-
-                # embeddings へ変換するモデルのロード
-                model = SentenceTransformer("cl-nagoya/sup-simcse-ja-base")
-                model.max_seq_length = 512
+                # wikipediaデータ、faiss index、embedding化のためのデータをロード
+                wikija_dataset, faiss_index, model = load_wiki()
 
             st.subheader(f"依頼テーマ：")
             st.markdown(f"""#### 『{st.session_state["user_theme"]}』""")
@@ -1791,6 +1777,7 @@ Please add a logical connection and a conjunction to the the text below.
                     del split_sentences[i]
 
             with st.spinner("インスタでアカウントを検索中 ..."):
+                # wikipediaデータ、faiss index、embedding化のためのデータをロード
                 wikija_dataset, faiss_index, model = load_wiki()
 
             st.subheader(f"依頼テーマ：")
