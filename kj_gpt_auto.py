@@ -1282,6 +1282,7 @@ def messages_init():
 
 def main():
     init_page()
+    init_messages()
 
     # OpenAI API Keyの入力
     with st.form("my_api_key", clear_on_submit=True):
@@ -1293,7 +1294,6 @@ def main():
     
     if openai_api_key:
         llm = select_model(openai_api_key)
-    init_messages()
 
     translated_theme = None
 
