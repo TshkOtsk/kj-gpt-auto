@@ -303,7 +303,7 @@ Items with conflicting content should be grouped separately.
     return prompt_ptrn
 
 def theme_translate(user_theme,openai_api_key):
-    theme = "ユーザーが入力するのは、" + user_theme + "についてのデータです。"
+    theme = "私が入力するのは、" + user_theme + "についてのデータです。"
     llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-0613")
     translating_prompt = f"""
 Please translate the following Japanese sentence into English.
@@ -1272,6 +1272,27 @@ Please include three or four of the following emojis in the text in any combinat
     st.session_state.costs.append(cost)
     return answer
 
+def load_wiki():
+    # wikipedia 日本語データセットのロード
+    wikija_dataset = load_dataset(
+        path="singletongue/wikipedia-utils",
+        name="passages-c400-jawiki-20230403",
+        split="train",
+    )
+    # faiss index のダウンロード
+    dm = DownloadManager()
+    index_local_path = dm.download(
+        f"https://huggingface.co/datasets/hotchpotch/wikipedia-passages-jawiki-embeddings/resolve/main/faiss_indexes/passages-c400-jawiki-20230403/sup-simcse-ja-base/index_IVF2048_PQ192.faiss"
+    )
+    # faiss index のロード
+    faiss_index = faiss.read_index(index_local_path)
+
+    # embeddings へ変換するモデルのロード
+    model = SentenceTransformer("cl-nagoya/sup-simcse-ja-base")
+    model.max_seq_length = 512
+
+    return wikija_dataset, faiss_index, model
+
 def messages_init():
     st.session_state.messages = [
         SystemMessage(content=""),
@@ -1294,6 +1315,7 @@ def main():
     
     if openai_api_key:
         llm = select_model(st.session_state["openai_api_key"])
+
     translated_theme = None
 
     # ユーザーの入力を監視
@@ -1769,23 +1791,7 @@ Please add a logical connection and a conjunction to the the text below.
                     del split_sentences[i]
 
             with st.spinner("インスタでアカウントを検索中 ..."):
-                # wikipedia 日本語データセットのロード
-                wikija_dataset = load_dataset(
-                    path="singletongue/wikipedia-utils",
-                    name="passages-c400-jawiki-20230403",
-                    split="train",
-                )
-                # faiss index のダウンロード
-                dm = DownloadManager()
-                index_local_path = dm.download(
-                    f"https://huggingface.co/datasets/hotchpotch/wikipedia-passages-jawiki-embeddings/resolve/main/faiss_indexes/passages-c400-jawiki-20230403/sup-simcse-ja-base/index_IVF2048_PQ192.faiss"
-                )
-                # faiss index のロード
-                faiss_index = faiss.read_index(index_local_path)
-
-                # embeddings へ変換するモデルのロード
-                model = SentenceTransformer("cl-nagoya/sup-simcse-ja-base")
-                model.max_seq_length = 512
+                wikija_dataset, faiss_index, model = load_wiki()
 
             st.subheader(f"依頼テーマ：")
             st.markdown(f"""#### 『{st.session_state["user_theme"]}』""")
