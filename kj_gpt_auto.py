@@ -1282,6 +1282,7 @@ def messages_init():
 def main():
     init_page()
     init_messages()
+    llm = ""
 
     # OpenAI API Keyの入力
     with st.form("my_api_key", clear_on_submit=True):
