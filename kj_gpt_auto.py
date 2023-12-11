@@ -8,7 +8,9 @@ from langchain.schema import (
     AIMessage
 )
 from langchain.callbacks import get_openai_callback
+import openai
 
+import os
 import re
 import urllib.parse
 import random
@@ -20,6 +22,7 @@ from datasets import load_dataset
 from sentence_transformers import SentenceTransformer
 import faiss
 
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 theme = ""
 prompt_ptrn = ""
@@ -1598,7 +1601,7 @@ Please add a logical connection and a conjunction to the the text below.
         with st.form(key="my_related", clear_on_submit=False):
             summarized_data = st.text_area(label="まとめの文章: ", key="summarized_data", value=st.session_state["summarized_data"], height=300)
             ask_detective_button = st.form_submit_button(label="次の取材対象を探偵に聞く🕵️‍♂️")
-            ask_gal_button = st.form_submit_button(label="ネクストターゲットをギャルに教えてもらう🙏🏻✨")
+            ask_gal_button = st.form_submit_button(label="ネクストターゲットを大学生に教えてもらう🙏🏻✨💌")
 
         if ask_detective_button and summarized_data:
 
@@ -1777,7 +1780,7 @@ Please add a logical connection and a conjunction to the the text below.
 
             st.subheader(f"依頼テーマ：")
             st.markdown(f"""#### 『{st.session_state["user_theme"]}』""")
-            st.markdown("上のまとめをもとに、次に調査すべき対象をギャルから聞きました🤭🤍")
+            st.markdown("上のまとめをもとに、次に調査すべき対象を大学生から聞きました🤭🤍")
             st.caption("""
 インターネットや図書館で調べたり、実際に現地を訪れたりするための入り口にしてみてください。
 そこで出会ったり見聞きしたことから、更に次の調査対象に渡り歩き、最終的にあなたの問題意識を更に深めることができます。\n
