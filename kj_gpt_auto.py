@@ -22,7 +22,6 @@ import faiss
 
 theme = ""
 prompt_ptrn = ""
-openai_api_key = ""
 
 # 例示データの出典
 # 「何となく気になる興味関心について」
@@ -303,7 +302,7 @@ Items with conflicting content should be grouped separately.
         prompt_ptrn = grouping5
     return prompt_ptrn
 
-def theme_translate(user_theme):
+def theme_translate(user_theme,openai_api_key):
     theme = "ユーザーが入力するのは、" + user_theme + "についてのデータです。"
     llm = ChatOpenAI(api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-0613")
     translating_prompt = f"""
@@ -318,7 +317,7 @@ Please translate the following Japanese sentence into English.
     st.session_state["translated_theme"] = translated_theme
     return translated_theme
 
-def eng_translates(text):
+def eng_translates(text,openai_api_key):
     llm = ChatOpenAI(api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-16k-0613")
     translating_prompt = f"""
 Please translate the following Japanese sentence into English.
@@ -331,7 +330,7 @@ Please translate the following Japanese sentence into English.
     st.session_state.costs.append(cost)
     return translated_text
 
-def summarize(text):
+def summarize(text,openai_api_key):
     llm = ChatOpenAI(api_key=openai_api_key, temperature=0.7, model_name="gpt-4-1106-preview")
     translating_prompt = f"""
 ### Instruction:
@@ -359,7 +358,7 @@ Please write in Japanese.
     st.session_state.costs.append(cost)
     return summarized_text
 
-def data_generating(user_theme):
+def data_generating(user_theme,openai_api_key):
     theme = user_theme
     llm = ChatOpenAI(api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-0613")
     translating_prompt = f"""
@@ -785,7 +784,7 @@ def init_messages():
 
 
 
-def select_model():
+def select_model(openai_api_key):
     model = st.sidebar.radio("Choose a model:", ("GPT-3.5", "GPT-3.5-16k", "GPT-4", "GPT-4-Turbo"),index=3)
     if model == "GPT-3.5":
         model_name = "gpt-3.5-turbo-0613"
@@ -977,7 +976,7 @@ def split_by_hashes(text):
 
     return related_sections
 
-def sentence_generating(llm,group,translated_theme,summarized_list):
+def sentence_generating(llm,group,translated_theme,summarized_list,openai_api_key):
     combined_list = []
     # simplified_list = []
     # summarized_list = []
@@ -989,7 +988,7 @@ def sentence_generating(llm,group,translated_theme,summarized_list):
     print("last_answerは", last_answer)
     
     if last_answer:
-        last_answer_summarized = summarize(last_answer)
+        last_answer_summarized = summarize(last_answer,openai_api_key)
     else:
         last_answer_summarized = ""
     print("last_answerの要約は", last_answer_summarized)
@@ -1285,7 +1284,7 @@ def main():
     openai_api_key = st.text_input("OpenAI API Key", type="password")
     
     if openai_api_key:
-        llm = select_model()
+        llm = select_model(openai_api_key)
     init_messages()
 
     translated_theme = None
@@ -1299,7 +1298,7 @@ def main():
             theme_button = st.form_submit_button(label="決定")
         if theme_button and user_theme:
             st.session_state["user_theme"] = user_theme
-            translated_theme = theme_translate(user_theme)
+            translated_theme = theme_translate(user_theme,openai_api_key)
 
 
     container = st.container()
@@ -1313,7 +1312,7 @@ def main():
             # symbol_button = st.form_submit_button(label="シンボル作成")
 
         # if generating_button and user_theme:
-        #     prompt_ptrn = data_generating(user_theme)
+        #     prompt_ptrn = data_generating(user_theme,openai_api_key)
         #     st.session_state.messages.append(SystemMessage(content=prompt_ptrn))
         #     st.session_state.messages.append(HumanMessage(content=user_input))
         #     with st.spinner("KJ-GPTが元データを生成しています ..."):
@@ -1564,7 +1563,7 @@ Please add a logical connection and a conjunction to the the text below.
                 for group in basic_data_for_abduction:
                     print("basic_data_for_abductionのグループ：", group)
                     # sentence_generatingで文章化し、返し値の要約文をjust_before_answer_summarizedに格納
-                    just_before_answer_summarized = sentence_generating(llm,group,st.session_state["translated_theme"],summarized_list)
+                    just_before_answer_summarized = sentence_generating(llm,group,st.session_state["translated_theme"],summarized_list,sentence_generating)
                     summarized_list.append(just_before_answer_summarized)
 
                 # print("1240行目のsummarized_list：", summarized_list)
