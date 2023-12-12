@@ -1699,6 +1699,7 @@ Please add a logical connection and a conjunction to the the text below.
                             response = requests.get(url)
                             json_data = response.json()
 
+                            st.markdown(related_sentence_generating(llm,item,data["text"],st.session_state["translated_theme"],wiki_extract))
                             st.markdown(f"### ・{wiki_title}")
                             if "thumbnail" in json_data:
                                 thumbnail_image = json_data["thumbnail"]['source']
@@ -1706,7 +1707,6 @@ Please add a logical connection and a conjunction to the the text below.
                             if "extract" in json_data:
                                 wiki_extract = json_data["extract"]
                                 st.caption(wiki_extract)
-                            st.markdown(related_sentence_generating(llm,item,data["text"],st.session_state["translated_theme"],wiki_extract))
                             st.markdown(wiki_text)
                             st.link_button("Wikipedia", "https://ja.wikipedia.org/wiki/" + data["title"] + "#:~:text=" + first_sentence_wiki)
                             
@@ -1830,6 +1830,7 @@ Please add a logical connection and a conjunction to the the text below.
                             response = requests.get(url)
                             json_data = response.json()
 
+                            st.markdown(related_gal_sentence_generating(llm,item,data["text"],st.session_state["translated_theme"],wiki_extract))
                             st.markdown(f"### ・{wiki_title}")
                             if "thumbnail" in json_data:
                                 thumbnail_image = json_data["thumbnail"]['source']
@@ -1837,7 +1838,6 @@ Please add a logical connection and a conjunction to the the text below.
                             if "extract" in json_data:
                                 wiki_extract = json_data["extract"]
                                 st.caption(wiki_extract)
-                            st.markdown(related_gal_sentence_generating(llm,item,data["text"],st.session_state["translated_theme"],wiki_extract))
                             st.markdown(wiki_text)
                             st.link_button("Wikipedia", "https://ja.wikipedia.org/wiki/" + data["title"] + "#:~:text=" + first_sentence_wiki)
                             
