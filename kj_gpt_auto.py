@@ -785,7 +785,7 @@ def init_messages():
         st.session_state["summarized_data"] = ""
 
 def select_model(openai_api_key):
-    model = st.sidebar.radio("モデルを選ぶ:", ("GPT-3.5", "GPT-3.5-16k", "GPT-4", "GPT-4-Turbo"),index=3)
+    model = st.sidebar.radio("モデル:", ("GPT-3.5", "GPT-3.5-16k", "GPT-4", "GPT-4-Turbo"),index=3)
     if model == "GPT-3.5":
         model_name = "gpt-3.5-turbo-0613"
     elif model == "GPT-3.5-16k":
@@ -1930,8 +1930,8 @@ Please add a logical connection and a conjunction to the the text below.
 
     # コストの計算と表示
     costs = st.session_state.get('costs', [])
-    st.sidebar.markdown("## Costs")
-    st.sidebar.markdown(f"**Total cost: ${sum(costs):.5f}**")
+    st.sidebar.markdown("## 料金")
+    st.sidebar.markdown(f"**合計金額: ${sum(costs):.5f}**")
     for cost in costs:
         st.sidebar.markdown(f"- ${cost:.5f}")
 
