@@ -1092,10 +1092,11 @@ Start writing so that it connects logically with the following sentences.
     # st.markdown(summarized_sentences)
     # return combined_sentences, simplified_sentences
 
-def sumarized_sentence_generating(llm,group,translated_theme):
+def sumarized_sentence_generating(llm,group,translated_theme,style):
     combined_list = []
 
-    sentence = f"""
+    if style == "formal":
+        sentence = f"""
 ### Instructions:
 {translated_theme}
 Act as an introspective artist who excels at looking deep into his or her own mind.
@@ -1132,8 +1133,8 @@ iPadを使ったイラストの才能を活かし、原作の魅力を損なわ�
 
 ### Input:
 """
-
-    sentence = f"""
+    else:
+        sentence = f"""
 ### Instructions:
 {translated_theme}
 Act as an introspective artist who excels at looking deep into his or her own mind.
@@ -1635,7 +1636,7 @@ Please add a logical connection and a conjunction to the the text below.
             just_before_answer_summarized = ""
             print("まとめの文章：", summarized_text)
             st.markdown("**まとめ**")
-            summarized_all = sumarized_sentence_generating(llm,summarized_text,st.session_state["translated_theme"])
+            summarized_all = sumarized_sentence_generating(llm,summarized_text,st.session_state["translated_theme"],style)
             # summarized_all = summarized_all.replace("\n","")
             st.session_state["summarized_data"] = summarized_all
             st.markdown(summarized_all)
@@ -1849,8 +1850,9 @@ Please add a logical connection and a conjunction to the the text below.
                                 wiki_extract = json_data["extract"]
                             else:
                                 wiki_extract = ""
-                            st.markdown(related_gal_sentence_generating(llm,item,data["text"],st.session_state["translated_theme"],wiki_extract))
+                            gal_answer = related_gal_sentence_generating(llm,item,data["text"],st.session_state["translated_theme"],wiki_extract)
                             st.markdown(f"### ・{wiki_title}")
+                            st.markdown(gal_answer)
                             if "thumbnail" in json_data:
                                 thumbnail_image = json_data["thumbnail"]['source']
                                 st.image(thumbnail_image)
