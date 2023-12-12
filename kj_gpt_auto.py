@@ -1701,6 +1701,8 @@ Please add a logical connection and a conjunction to the the text below.
 
                             if "extract" in json_data:
                                 wiki_extract = json_data["extract"]
+                            else:
+                                wiki_extract = ""
                             st.markdown(related_sentence_generating(llm,item,data["text"],st.session_state["translated_theme"],wiki_extract))
                             st.markdown(f"### ・{wiki_title}")
                             if "thumbnail" in json_data:
@@ -1833,6 +1835,8 @@ Please add a logical connection and a conjunction to the the text below.
 
                             if "extract" in json_data:
                                 wiki_extract = json_data["extract"]
+                            else:
+                                wiki_extract = ""
                             st.markdown(related_gal_sentence_generating(llm,item,data["text"],st.session_state["translated_theme"],wiki_extract))
                             st.markdown(f"### ・{wiki_title}")
                             if "thumbnail" in json_data:
