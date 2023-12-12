@@ -754,10 +754,10 @@ def init_page():
         page_icon="🕵️‍♂️"
     )
     st.header("KJ-GPT 🕵️‍♂️")
-    st.sidebar.title("Options")
+    st.sidebar.title("オプション")
 
 def init_messages():
-    clear_button = st.sidebar.button("Clear Conversation", key="clear")
+    clear_button = st.sidebar.button("履歴をリセット", key="clear")
     if clear_button or "messages" not in st.session_state:
 
         st.session_state.messages = [
@@ -784,10 +784,8 @@ def init_messages():
 
         st.session_state["summarized_data"] = ""
 
-
-
 def select_model(openai_api_key):
-    model = st.sidebar.radio("Choose a model:", ("GPT-3.5", "GPT-3.5-16k", "GPT-4", "GPT-4-Turbo"),index=3)
+    model = st.sidebar.radio("モデルを選ぶ:", ("GPT-3.5", "GPT-3.5-16k", "GPT-4", "GPT-4-Turbo"),index=3)
     if model == "GPT-3.5":
         model_name = "gpt-3.5-turbo-0613"
     elif model == "GPT-3.5-16k":
@@ -1606,9 +1604,11 @@ Please add a logical connection and a conjunction to the the text below.
                 # BDAごとに文章化
                 for group in basic_data_for_abduction:
                     print("basic_data_for_abductionのグループ：", group)
-                    # sentence_generatingで文章化し、返し値の要約文をjust_before_answer_summarizedに格納
-                    just_before_answer_summarized = sentence_generating(llm,group,st.session_state["translated_theme"],summarized_list,st.session_state["openai_api_key"],style)
-                    summarized_list.append(just_before_answer_summarized)
+                    # groupが1つ（シンボルマークのみ）の場合を除いて文章化を実行
+                    if len(group) > 1:
+                        # sentence_generatingで文章化し、返し値の要約文をjust_before_answer_summarizedに格納
+                        just_before_answer_summarized = sentence_generating(llm,group,st.session_state["translated_theme"],summarized_list,st.session_state["openai_api_key"],style)
+                        summarized_list.append(just_before_answer_summarized)
 
                 # print("1240行目のsummarized_list：", summarized_list)
                 # summarized_list = [s for s in summarized_list if s != ""]
