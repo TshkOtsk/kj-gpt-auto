@@ -407,6 +407,17 @@ Please write in Japanese.
 """
     return generating_prompt
 
+def select_style():
+    # 文章スタイルの選択
+    style_choice = st.sidebar.radio("文章化のスタイル:", ("カジュアル", "フォーマル"))
+    if style_choice == "カジュアル":
+        style = "casual"
+        sytle_prompt = "Write in a casual manner."
+    else:
+        style = "formal"
+        sytle_prompt = "Please write in a formal manner."
+    return style
+
 labeling1 = f"""
 ### Instructions:
 Please summarize the items of groups in one concise sentence with a deeper meaning.
@@ -680,17 +691,6 @@ def select_model(openai_api_key):
     temperature = st.sidebar.slider("Temperature:", min_value=0.0, max_value=1.0, value=0.7, step=0.01)
     
     return ChatOpenAI(openai_api_key=openai_api_key, temperature=temperature, model_name=model_name)
-
-def select_style():
-    # 文章スタイルの選択
-    style_choice = st.sidebar.radio("文章化のスタイル:", ("カジュアル", "フォーマル"))
-    if style_choice == "カジュアル":
-        style = "casual"
-        sytle_prompt = "Write in a casual manner."
-    else:
-        style = "formal"
-        sytle_prompt = "Please write in a formal manner."
-    return style
 
 def get_answer(llm, messages):
     with get_openai_callback() as cb:
