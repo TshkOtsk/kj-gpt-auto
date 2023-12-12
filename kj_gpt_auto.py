@@ -700,14 +700,14 @@ Please write in Japanese.
 福島県の自然や果物を活かした地産地消のつながりを作って、人が減っても活気ある地域にしたい
 京都の散策だったり座禅などで、歴史がある土地じゃないとできない体験を彼女と一緒にしたい
 ###Output:
-自然や食、歴史など、その土地ならではの結びつきや体験に興味があり、自分もそんな地域づくりがしたい
+自然とか食、歴史だったり、その土地でしか味わえない体験に興味があり、自分もそんな地域づくりがしたい
 
 ###Input:
 将来にとって意味がある本当の学びは、年に関係なく誰にとっても重要
 スポーツの面白さは、その競技が上手か下手かという以外にもあるのではないか
 障碍者もちゃんと給料をもらって生活できる社会にすべきだ
 ###Output:
-年齢とか障害、競技のレベルといった常識に捉われず、本当の未来を切り開いていく必要がある
+年齢とか障害、競技のレベルなどの常識は関係なしに、ガチの未来を切り開く必要がある
 
 ### Input:
 """
@@ -723,13 +723,13 @@ Please write in Japanese.
 自然や食、歴史など、その土地ならではの結びつきや体験に興味があり、自分もそんな地域づくりがしたい
 おじいちゃんの住む沖縄の陽気な雰囲気が好きだ
 ###Output:
-その土地土地が持つ歴史や自然環境、食文化や雰囲気などを、自分から楽しみ、そして広めたい
+その土地土が持ってる歴史や自然、食文化や雰囲気を、自分で楽しみみんなに広めたい
 
 ###Input:
 年齢とか障害、競技のレベルといった常識に捉われず、本当の未来を切り開いていく必要がある
 ウクライナとロシアの戦争はどうすれば解決するだろうか
 ###Output:
-すでにある枠組みをはみ出してでも、本当に大切な行動を起こし、平和な未来を目指したい
+常識の枠をぶち破ってでも、マジで大切な行動を起こして、平和な未来を目指したい
 
 ### Input:
 """
@@ -1086,7 +1086,7 @@ Start writing so that it connects logically with the following sentences.
     st.session_state.messages.append(SystemMessage(content=sentence))
     st.session_state.messages.append(HumanMessage(content=group))
     with st.spinner("KJ-GPTが文章化しています ..."):
-        answer, cost = get_answer(llm, st.session_state.messages[-3:])
+        answer, cost = get_answer(llm, st.session_state.messages[-5:])
     combined_list.append(answer)
     st.session_state.messages.append(AIMessage(content=answer))
     st.session_state.costs.append(cost)
