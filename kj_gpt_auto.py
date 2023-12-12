@@ -330,9 +330,11 @@ Please translate the following Japanese sentence into English.
     st.session_state.costs.append(cost)
     return translated_text
 
-def summarize(text,openai_api_key):
+def summarize(text,openai_api_key,style):
     llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.7, model_name="gpt-4-1106-preview")
-    translating_prompt = f"""
+
+    if style=="formal":
+        translating_prompt = f"""
 ### Instruction:
 Act as an introspective person who excels at looking deep into his or her own mind.
 Briefly summarise the following statement in about 50 words.
@@ -347,6 +349,26 @@ Please write in Japanese.
 
 ### Output:
 考える力や新しいことに挑戦する力を育むような本当に意味のある学びは、年齢に関係なく誰にでも大切だ。
+
+### Input:
+{text}
+"""
+    else:
+        translating_prompt = f"""
+### Instruction:
+Act as an introspective person who excels at looking deep into his or her own mind.
+Briefly summarise the following statement in about 50 words.
+
+### Conditions:
+Please write in Japanese.
+
+### Input:
+（その中でも一番気になっているのが、）宿題が多すぎて課題をこなすだけになっているのが嫌ということ。（答えのある問題をただ強制的に解答させられるのは無駄だと思う。インターネットやChatGPTなどが急速に発展しているので、そういった単なる暗記や論理計算は、そのうち人間がやる必要はなくなると思う。それなのに、このまま偏差値至上主義の詰め込み教育で今後もやっていくならば、何の役にも立たない大人を育てることになるだろう。）
+そうではなくて、もっと未来の社会を発展させるような意味ある勉強がしたい。（答えのない問いに試行錯誤しながら立ち向かったり、自分だけの特別な興味関心を育てて専門性を高めたりする勉強の方が今後求められるのは明らかだ。）つまり、目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたいということ。そしてそのためには、子どもだけじゃなく大人の教育も必要だと思う。
+（そもそも今の教師が昔ながらの詰め込み式の教育で育ったので、その意識改革が必要だ。教師自身が答えのない自分の心の底から出てきた問いを設定し、生徒と一緒にそれに取り組む姿勢を見せないと、子供達はついていかない。それだけではなく、子供の親たちも新しい学びを人生に取り入れなければならない。答えのない探究活動は従来の学習に比べて、より日常生活に深く関わるものだ。普段過ごしている中で感じる疑問や違和感などを起点にした、実体験に即した問いであるほど、今後の長い人生で取り組むに値する深いものになりやすい。なので、これまでのように親が教育を学校や塾に任せっぱなしにして、家庭で子供に無関心でいては子供の探究心が育ちにくくなる。教師と同じように、親たちも自分の問いを立ててそれを追求する営みを実際にやるべきだ。そして、その行動が子供たちを感化させ、家庭を活気づかせて、さらには職場のパフォーマンスも上げることになるのが理想だ。）これらをまとめると、未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要なのだと言える。
+
+### Output:
+本当に意味のある勉強は、考える力とか新しいことに挑戦する力を伸ばしてくれて、それはいくつになっても大切なことだ。
 
 ### Input:
 {text}
@@ -803,7 +825,7 @@ def select_model(openai_api_key):
 
 def select_style():
     # 文章スタイルの選択
-    style_choice = st.sidebar.radio("文章スタイル:", ("カジュアル", "フォーマル"))
+    style_choice = st.sidebar.radio("文章化のスタイル:", ("カジュアル", "フォーマル"))
     if style_choice == "カジュアル":
         style = "casual"
     else:
@@ -997,7 +1019,7 @@ def sentence_generating(llm,group,translated_theme,summarized_list,openai_api_ke
     print("last_answerは", last_answer)
     
     if last_answer:
-        last_answer_summarized = summarize(last_answer,openai_api_key)
+        last_answer_summarized = summarize(last_answer,openai_api_key,style)
     else:
         last_answer_summarized = ""
     print("last_answerの要約は", last_answer_summarized)
@@ -1275,7 +1297,7 @@ Please include three or four of the following emojis in the text in any combinat
 
     st.session_state.messages.append(SystemMessage(content=sentence))
     # st.session_state.messages.append(HumanMessage(content=group))
-    with st.spinner("DMが返ってくるのを待っています ..."):
+    with st.spinner("返信を待っています ..."):
         answer, cost = get_answer(llm, st.session_state.messages[-1:])
     st.session_state.messages.append(AIMessage(content=answer))
     st.session_state.costs.append(cost)
@@ -1606,7 +1628,7 @@ Please add a logical connection and a conjunction to the the text below.
                 for group in basic_data_for_abduction:
                     print("basic_data_for_abductionのグループ：", group)
                     # groupが1つ（シンボルマークのみ）の場合を除いて文章化を実行
-                    if len(group) > 1:
+                    if "\n" in group:
                         # sentence_generatingで文章化し、返し値の要約文をjust_before_answer_summarizedに格納
                         just_before_answer_summarized = sentence_generating(llm,group,st.session_state["translated_theme"],summarized_list,st.session_state["openai_api_key"],style)
                         summarized_list.append(just_before_answer_summarized)
