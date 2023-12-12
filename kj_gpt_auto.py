@@ -1086,7 +1086,7 @@ Start writing so that it connects logically with the following sentences.
     st.session_state.messages.append(SystemMessage(content=sentence))
     st.session_state.messages.append(HumanMessage(content=group))
     with st.spinner("KJ-GPTが文章化しています ..."):
-        answer, cost = get_answer(llm, st.session_state.messages[-2:])
+        answer, cost = get_answer(llm, st.session_state.messages[-3:])
     combined_list.append(answer)
     st.session_state.messages.append(AIMessage(content=answer))
     st.session_state.costs.append(cost)
