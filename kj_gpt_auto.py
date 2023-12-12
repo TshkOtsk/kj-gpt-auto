@@ -368,7 +368,7 @@ Please write in Japanese.
 （そもそも今の教師が昔ながらの詰め込み式の教育で育ったので、その意識改革が必要だ。教師自身が答えのない自分の心の底から出てきた問いを設定し、生徒と一緒にそれに取り組む姿勢を見せないと、子供達はついていかない。それだけではなく、子供の親たちも新しい学びを人生に取り入れなければならない。答えのない探究活動は従来の学習に比べて、より日常生活に深く関わるものだ。普段過ごしている中で感じる疑問や違和感などを起点にした、実体験に即した問いであるほど、今後の長い人生で取り組むに値する深いものになりやすい。なので、これまでのように親が教育を学校や塾に任せっぱなしにして、家庭で子供に無関心でいては子供の探究心が育ちにくくなる。教師と同じように、親たちも自分の問いを立ててそれを追求する営みを実際にやるべきだ。そして、その行動が子供たちを感化させ、家庭を活気づかせて、さらには職場のパフォーマンスも上げることになるのが理想だ。）これらをまとめると、未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要なのだと言える。
 
 ### Output:
-本当に意味のある勉強は、考える力とか新しいことに挑戦する力を伸ばしてくれて、それはいくつになっても大切なことだ。
+ガチで意味ある勉強をすれば、考える力とか挑戦する力が伸びるし、それは子どもだけじゃなくて大人になっても大切。
 
 ### Input:
 {text}
@@ -1086,7 +1086,7 @@ Start writing so that it connects logically with the following sentences.
     st.session_state.messages.append(SystemMessage(content=sentence))
     st.session_state.messages.append(HumanMessage(content=group))
     with st.spinner("KJ-GPTが文章化しています ..."):
-        answer, cost = get_answer(llm, st.session_state.messages[-5:])
+        answer, cost = get_answer(llm, st.session_state.messages[-2:])
     combined_list.append(answer)
     st.session_state.messages.append(AIMessage(content=answer))
     st.session_state.costs.append(cost)
