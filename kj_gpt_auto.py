@@ -805,8 +805,8 @@ def select_model(openai_api_key):
 
 def select_style():
     # 文章スタイルの選択
-    style_choice = st.sidebar.radio("文章:", ("くだけた表現", "重厚な文体"))
-    if style_choice == "くだけた表現":
+    style_choice = st.sidebar.radio("文章スタイル:", ("カジュアル", "フォーマル"))
+    if style_choice == "カジュアル":
         style = "casual"
     else:
         style = "formal"
