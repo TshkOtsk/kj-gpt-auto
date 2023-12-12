@@ -803,6 +803,15 @@ def select_model(openai_api_key):
     
     return ChatOpenAI(openai_api_key=openai_api_key, temperature=temperature, model_name=model_name)
 
+def select_style():
+    # 文章スタイルの選択
+    style_choice = st.sidebar.radio("文章:", ("くだけた表現", "重厚な文体"))
+    if style_choice == "くだけた表現":
+        style = "casual"
+    else:
+        style = "formal"
+    return style
+
 def get_answer(llm, messages):
     with get_openai_callback() as cb:
         answer = llm(messages)
@@ -978,7 +987,7 @@ def split_by_hashes(text):
 
     return related_sections
 
-def sentence_generating(llm,group,translated_theme,summarized_list,openai_api_key):
+def sentence_generating(llm,group,translated_theme,summarized_list,openai_api_key,style):
     combined_list = []
     # simplified_list = []
     # summarized_list = []
@@ -997,34 +1006,35 @@ def sentence_generating(llm,group,translated_theme,summarized_list,openai_api_ke
 
     print("内容は　", group)
 
-#     sentence = f"""
-# ### Instructions:
-# {translated_theme}
-# Act as an introspective person who excels at looking deep into his or her own mind.
-# Please write sentences that connect the following bullet points.
+    if style == "formal":
+        sentence = f"""
+### Instructions:
+{translated_theme}
+Act as an introspective person who excels at looking deep into his or her own mind.
+Please write sentences that connect the following bullet points.
 
-# ### Condition:
-# Please write in Japanese.
-# Any additional explanations should be enclosed in parentheses.
-# Start writing so that it connects logically with the following sentences.
-# {last_answer_summarized}
+### Condition:
+Please write in Japanese.
+Any additional explanations should be enclosed in parentheses.
+Start writing so that it connects logically with the following sentences.
+{last_answer_summarized}
 
-# ### Input:
-# # 未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要だ
-# ## 子どもだけじゃなく大人の教育も必要だと思う
-# ## 目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたい
-# ### 宿題が多すぎて課題をこなすだけになっているのが嫌
-# ### 未来の社会を発展させるような意味ある勉強がしたい
+### Input:
+# 未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要だ
+## 子どもだけじゃなく大人の教育も必要だと思う
+## 目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたい
+### 宿題が多すぎて課題をこなすだけになっているのが嫌
+### 未来の社会を発展させるような意味ある勉強がしたい
 
-# ### Output:
-# 例えば、宿題が多すぎて課題をこなすだけになっているのが嫌だ。（答えのある問題をただ強制的に解答させられるのは無駄だと思う。インターネットやChatGPTなどが急速に発展しているので、そういった単なる暗記や論理計算は、そのうち人間がやる必要はなくなると思う。それなのに、このまま偏差値至上主義の詰め込み教育で今後もやっていくならば、何の役にも立たない大人を育てることになるだろう。）
-# そうではなくて、もっと未来の社会を発展させるような意味ある勉強がしたい。（答えのない問いに試行錯誤しながら立ち向かったり、自分だけの特別な興味関心を育てて専門性を高めたりする勉強の方が今後求められるのは明らかだ。）つまり、目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたいということ。そしてそのためには、子どもだけじゃなく大人の教育も必要だと思う。
-# （そもそも今の教師が昔ながらの詰め込み式の教育で育ったので、その意識改革が必要だ。教師自身が答えのない自分の心の底から出てきた問いを設定し、生徒と一緒にそれに取り組む姿勢を見せないと、子供達はついていかない。それだけではなく、子供の親たちも新しい学びを人生に取り入れなければならない。答えのない探究活動は従来の学習に比べて、より日常生活に深く関わるものだ。普段過ごしている中で感じる疑問や違和感などを起点にした、実体験に即した問いであるほど、今後の長い人生で取り組むに値する深いものになりやすい。なので、これまでのように親が教育を学校や塾に任せっぱなしにして、家庭で子供に無関心でいては子供の探究心が育ちにくくなる。教師と同じように、親たちも自分の問いを立ててそれを追求する営みを実際にやるべきだ。そして、その行動が子供たちを感化させ、家庭を活気づかせて、さらには職場のパフォーマンスも上げることになるのが理想だ。）これらをまとめると、未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要なのだと言える。
+### Output:
+例えば、宿題が多すぎて課題をこなすだけになっているのが嫌だ。（答えのある問題をただ強制的に解答させられるのは無駄だと思う。インターネットやChatGPTなどが急速に発展しているので、そういった単なる暗記や論理計算は、そのうち人間がやる必要はなくなると思う。それなのに、このまま偏差値至上主義の詰め込み教育で今後もやっていくならば、何の役にも立たない大人を育てることになるだろう。）
+そうではなくて、もっと未来の社会を発展させるような意味ある勉強がしたい。（答えのない問いに試行錯誤しながら立ち向かったり、自分だけの特別な興味関心を育てて専門性を高めたりする勉強の方が今後求められるのは明らかだ。）つまり、目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたいということ。そしてそのためには、子どもだけじゃなく大人の教育も必要だと思う。
+（そもそも今の教師が昔ながらの詰め込み式の教育で育ったので、その意識改革が必要だ。教師自身が答えのない自分の心の底から出てきた問いを設定し、生徒と一緒にそれに取り組む姿勢を見せないと、子供達はついていかない。それだけではなく、子供の親たちも新しい学びを人生に取り入れなければならない。答えのない探究活動は従来の学習に比べて、より日常生活に深く関わるものだ。普段過ごしている中で感じる疑問や違和感などを起点にした、実体験に即した問いであるほど、今後の長い人生で取り組むに値する深いものになりやすい。なので、これまでのように親が教育を学校や塾に任せっぱなしにして、家庭で子供に無関心でいては子供の探究心が育ちにくくなる。教師と同じように、親たちも自分の問いを立ててそれを追求する営みを実際にやるべきだ。そして、その行動が子供たちを感化させ、家庭を活気づかせて、さらには職場のパフォーマンスも上げることになるのが理想だ。）これらをまとめると、未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要なのだと言える。
 
-# ### Input:
-# """
-    
-    sentence = f"""
+### Input:
+"""
+    else:
+        sentence = f"""
 ### Instructions:
 {translated_theme}
 Act as an introspective person who excels at looking deep into his or her own mind.
@@ -1305,6 +1315,8 @@ def main():
     init_page()
     init_messages()
     llm = ""
+
+    style = select_style()
 
     # OpenAI API Keyの入力
     with st.form("my_api_key", clear_on_submit=True):
@@ -1595,7 +1607,7 @@ Please add a logical connection and a conjunction to the the text below.
                 for group in basic_data_for_abduction:
                     print("basic_data_for_abductionのグループ：", group)
                     # sentence_generatingで文章化し、返し値の要約文をjust_before_answer_summarizedに格納
-                    just_before_answer_summarized = sentence_generating(llm,group,st.session_state["translated_theme"],summarized_list,st.session_state["openai_api_key"])
+                    just_before_answer_summarized = sentence_generating(llm,group,st.session_state["translated_theme"],summarized_list,st.session_state["openai_api_key"],style)
                     summarized_list.append(just_before_answer_summarized)
 
                 # print("1240行目のsummarized_list：", summarized_list)
