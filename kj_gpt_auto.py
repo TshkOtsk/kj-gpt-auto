@@ -22,6 +22,7 @@ import faiss
 
 theme = ""
 prompt_ptrn = ""
+sytle_prompt = ""
 
 # 例示データの出典
 # 「何となく気になる興味関心について」
@@ -406,153 +407,158 @@ Please write in Japanese.
 """
     return generating_prompt
 
-# labeling1 = """
-# ### Instructions:
-# Please summarize the items of groups in one concise sentence with a deeper meaning.
+labeling1 = f"""
+### Instructions:
+Please summarize the items of groups in one concise sentence with a deeper meaning.
 
-# ### Conditions:
-# Please write in Japanese.
+### Conditions:
+Please write in Japanese.
+{sytle_prompt}
 
-# ###Input:
-# 地元のご当地スイーツがあれば食べたい
-# 住んでいる福島県のフルーツをもっとアピールしたい
-# ###Output:
-# 福島県のスイーツを活かした、ご当地スイーツが食べたい
+###Input:
+地元のご当地スイーツがあれば食べたい
+住んでいる福島県のフルーツをもっとアピールしたい
+###Output:
+福島県のスイーツを活かした、ご当地スイーツが食べたい
 
-# ###Input:
-# 宿題が多すぎて課題をこなすだけになっているのが嫌
-# 未来の社会を発展させるような意味ある勉強がしたい
-# ###Output:
-# 目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたい
+###Input:
+宿題が多すぎて課題をこなすだけになっているのが嫌
+未来の社会を発展させるような意味ある勉強がしたい
+###Output:
+目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたい
 
-# ###Input:
-# 食品ロスをどうやって減らせばいいか気になる
-# 地域で作ったものは地元で食べたほうがいい
-# ###Output:
-# 無駄がなくて地域に根付いた食のつながりが大切だと思っている
+###Input:
+食品ロスをどうやって減らせばいいか気になる
+地域で作ったものは地元で食べたほうがいい
+###Output:
+無駄がなくて地域に根付いた食のつながりが大切だと思っている
 
-# ###Input:
-# 住んでいる地域の人口がどんどん減っていて不安
-# 友達と遊ぶときに交通手段が少ないのが悩み
-# ###Output:
-# 人口が減っていき、人との交流がなくなっていくのが心配
+###Input:
+住んでいる地域の人口がどんどん減っていて不安
+友達と遊ぶときに交通手段が少ないのが悩み
+###Output:
+人口が減っていき、人との交流がなくなっていくのが心配
 
-# ###Input:
-# 修学旅行で行く京都の座禅体験がたのしみ
-# 歴史ある京都の町並みがとても好きだ
-# ###Output:
-# 街並みや座禅など歴史ある京都でしか味わえない体験が好き
+###Input:
+修学旅行で行く京都の座禅体験がたのしみ
+歴史ある京都の町並みがとても好きだ
+###Output:
+街並みや座禅など歴史ある京都でしか味わえない体験が好き
 
-# ### Input:
-# """
+### Input:
+"""
 
-# labeling2 = """
-# ### Instructions:
-# Please summarize the items of groups in one concise sentence with a deeper meaning.
+labeling2 = f"""
+### Instructions:
+Please summarize the items of groups in one concise sentence with a deeper meaning.
 
-# ### Conditions:
-# Please write in Japanese.
+### Conditions:
+Please write in Japanese.
+{sytle_prompt}
 
-# ###Input:
-# 福島県のスイーツを活かした、ご当地スイーツが食べたい
-# 福島県の自然を活かした町おこしに興味がある
-# ###Output:
-# 自然や果物、スイーツなどの強みを生かして、福島県を盛り上げたい
+###Input:
+福島県のスイーツを活かした、ご当地スイーツが食べたい
+福島県の自然を活かした町おこしに興味がある
+###Output:
+自然や果物、スイーツなどの強みを生かして、福島県を盛り上げたい
 
-# ###Input:
-# 目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたい
-# 子どもだけじゃなく大人の教育も必要だと思う
-# ###Output:
-# 未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要だ
+###Input:
+目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたい
+子どもだけじゃなく大人の教育も必要だと思う
+###Output:
+未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要だ
 
-# ###Input:
-# スポーツのプロとアマの違いはなんだろう
-# パラリンピックで見た障碍者の姿に感動した
-# 卓球部の部活のユニフォームがダサくていやだ
-# ###Output:
-# スポーツの魅力は、競技が上手いか下手かという以外にもあるのではないか
+###Input:
+スポーツのプロとアマの違いはなんだろう
+パラリンピックで見た障碍者の姿に感動した
+卓球部の部活のユニフォームがダサくていやだ
+###Output:
+スポーツの魅力は、競技が上手いか下手かという以外にもあるのではないか
 
-# ###Input:
-# 無駄がなくて地域に根付いた食のつながりが大切だと思っている
-# 人口が減っていき、人との交流がなくなっていくのが心配
-# ###Output:
-# コミュニティが小さくなっていくからこそ、効率的で地元に根付いた食のつながりを維持したい
+###Input:
+無駄がなくて地域に根付いた食のつながりが大切だと思っている
+人口が減っていき、人との交流がなくなっていくのが心配
+###Output:
+コミュニティが小さくなっていくからこそ、効率的で地元に根付いた食のつながりを維持したい
 
-# ### Input:
-# """
+### Input:
+"""
 
-# labeling3 = """
-# ### Instructions:
-# Please summarize the items of groups in one concise sentence with a deeper meaning.
+labeling3 = f"""
+### Instructions:
+Please summarize the items of groups in one concise sentence with a deeper meaning.
 
-# ### Conditions:
-# Please write in Japanese.
+### Conditions:
+Please write in Japanese.
+{sytle_prompt}
 
-# ###Input:
-# 自然や果物、スイーツなどの強みを生かして、福島県を盛り上げたい
-# コミュニティが小さくなっていくからこそ、効率的で地元に根付いた食のつながりを維持したい
-# ###Output:
-# 福島県の自然や果物を活かした地産地消のつながりを作り、人が減っても活気ある地域にしたい
+###Input:
+自然や果物、スイーツなどの強みを生かして、福島県を盛り上げたい
+コミュニティが小さくなっていくからこそ、効率的で地元に根付いた食のつながりを維持したい
+###Output:
+福島県の自然や果物を活かした地産地消のつながりを作り、人が減っても活気ある地域にしたい
 
-# ###Input:
-# 街並みや座禅など歴史ある京都でしか味わえない体験が好き
-# 歴史が好きな彼女を喜ばせたい
-# ###Output:
-# 京都での散策や座禅など、歴史ある土地に行かないとできない体験を彼女と一緒に楽しみたい
+###Input:
+街並みや座禅など歴史ある京都でしか味わえない体験が好き
+歴史が好きな彼女を喜ばせたい
+###Output:
+京都での散策や座禅など、歴史ある土地に行かないとできない体験を彼女と一緒に楽しみたい
 
-# ###Input:
-# 漫画をアニメ化しても、原作から全く違うのになってしまうのが気に食わない
-# 感動して泣けるような漫画がすきだ
-# ###Output:
-# アニメでは表せないような、漫画にしかない感動の体験がある
+###Input:
+漫画をアニメ化しても、原作から全く違うのになってしまうのが気に食わない
+感動して泣けるような漫画がすきだ
+###Output:
+アニメでは表せないような、漫画にしかない感動の体験がある
 
-# ### Input:
-# """
+### Input:
+"""
 
-# labeling4 = """
-# ### Instructions:
-# Please summarize the items of groups in one concise sentence with a deeper meaning.
+labeling4 = f"""
+### Instructions:
+Please summarize the items of groups in one concise sentence with a deeper meaning.
 
-# ### Conditions:
-# Please write in Japanese.
+### Conditions:
+Please write in Japanese.
+{sytle_prompt}
 
-# ###Input:
-# 福島県の自然や果物を活かした地産地消のつながりを作り、人が減っても活気ある地域にしたい
-# 京都での散策や座禅など、歴史ある土地に行かないとできない体験を彼女と一緒に楽しみたい
-# ###Output:
-# 自然や食、歴史など、その土地ならではの結びつきや体験に興味があり、自らもそうした地域づくりがしたい
+###Input:
+福島県の自然や果物を活かした地産地消のつながりを作り、人が減っても活気ある地域にしたい
+京都での散策や座禅など、歴史ある土地に行かないとできない体験を彼女と一緒に楽しみたい
+###Output:
+自然や食、歴史など、その土地ならではの結びつきや体験に興味があり、自らもそうした地域づくりがしたい
 
-# ###Input:
-# 未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要だ
-# スポーツの魅力は、競技が上手いか下手かという以外にもあるのではないか
-# 障碍者もちゃんと給料をもらって生活できる社会にすべきだ
-# ###Output:
-# 例えば年齢差や障害の有無、競技のレベルといったような常識の枠に捉われず、本質的な未来を切り開いていく必要がある
+###Input:
+未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要だ
+スポーツの魅力は、競技が上手いか下手かという以外にもあるのではないか
+障碍者もちゃんと給料をもらって生活できる社会にすべきだ
+###Output:
+例えば年齢差や障害の有無、競技のレベルといったような常識の枠に捉われず、本質的な未来を切り開いていく必要がある
 
-# ### Input:
-# """
+### Input:
+"""
 
-# labeling5 = """
-# ### Instructions:
-# Please summarize the items of groups in one concise sentence with a deeper meaning.
+labeling5 = f"""
+### Instructions:
+Please summarize the items of groups in one concise sentence with a deeper meaning.
 
-# ### Conditions:
-# Please write in Japanese.
+### Conditions:
+Please write in Japanese.
+{sytle_prompt}
 
-# ###Input:
-# 自然や食、歴史など、その土地ならではの結びつきや体験に興味があり、自らもそうした地域づくりがしたい
-# おじいちゃんの住む沖縄の陽気な雰囲気が好きだ
-# ###Output:
-# その土地土地が持つ歴史や自然環境、食文化や雰囲気などを、自分から楽しみ、そして広めたい
+###Input:
+自然や食、歴史など、その土地ならではの結びつきや体験に興味があり、自らもそうした地域づくりがしたい
+おじいちゃんの住む沖縄の陽気な雰囲気が好きだ
+###Output:
+その土地土地が持つ歴史や自然環境、食文化や雰囲気などを、自分から楽しみ、そして広めたい
 
-# ###Input:
-# 例えば年齢差や障害の有無、競技のレベルといったような常識の枠に捉われず、本質的な未来を切り開いていく必要がある
-# ウクライナとロシアの戦争はどうすれば解決するだろうか
-# ###Output:
-# 既存の枠組みや対立軸をはみ出してでも、本当に大切な行動を起こし、平和な未来を目指したい
+###Input:
+例えば年齢差や障害の有無、競技のレベルといったような常識の枠に捉われず、本質的な未来を切り開いていく必要がある
+ウクライナとロシアの戦争はどうすれば解決するだろうか
+###Output:
+既存の枠組みや対立軸をはみ出してでも、本当に大切な行動を起こし、平和な未来を目指したい
 
-# ### Input:
-# """
+### Input:
+"""
 
 # symbol = """
 # ### Instructions:
@@ -585,154 +591,6 @@ Please write in Japanese.
 
 # ### Input:
 # """
-
-labeling1 = """
-### Instructions:
-Please summarize the items of groups in one concise sentence with a deeper meaning.
-
-### Conditions:
-Please write in Japanese.
-
-###Input:
-地元のご当地スイーツがあれば食べたい
-住んでいる福島県のフルーツをもっとアピールしたい
-###Output:
-福島県のスイーツを活かした、ご当地スイーツが食べたい
-
-###Input:
-宿題が多すぎて課題をこなすだけになっているのが嫌
-未来の社会を発展させるような意味ある勉強がしたい
-###Output:
-毎日の宿題をただこなすんじゃなく、未来にとって意味があることを学びたい
-
-###Input:
-食品ロスをどうやって減らせばいいか気になる
-地域で作ったものは地元で食べたほうがいい
-###Output:
-ムダがなくて地域とちゃんとつながった食が大切と思っている
-
-###Input:
-住んでいる地域の人口がどんどん減っていて不安
-友達と遊ぶときに交通手段が少ないのが悩み
-###Output:
-人口がすくなくなっていって、みんなとの交流がなくなるのが心配
-
-###Input:
-修学旅行で行く京都の座禅体験がたのしみ
-歴史ある京都の町並みがとても好きだ
-###Output:
-街並みとか座禅とか、歴史がある京都でしか味わえない体験が好き
-
-### Input:
-"""
-
-labeling2 = """
-### Instructions:
-Please summarize the items of groups in one concise sentence with a deeper meaning.
-
-### Conditions:
-Please write in Japanese.
-
-###Input:
-福島県のスイーツを活かした、ご当地スイーツが食べたい
-福島県の自然を活かした町おこしに興味がある
-###Output:
-自然や果物、スイーツなど、福島県の得意なところで盛り上げたい
-
-###Input:
-目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたい
-子どもだけじゃなく大人の教育も必要だと思う
-###Output:
-将来にとって意味がある本当の学びは、年に関係なく誰にとっても必要
-
-###Input:
-スポーツのプロとアマの違いはなんだろう
-パラリンピックで見た障碍者の姿に感動した
-卓球部の部活のユニフォームがダサくていやだ
-###Output:
-スポーツの面白さは、上手か下手かという以外にもあるのではないか
-
-###Input:
-無駄がなくて地域に根付いた食のつながりが大切だと思っている
-人口が減っていき、人との交流がなくなっていくのが心配
-###Output:
-コミュニティが小さくなる一方だからこそ、地元に根付いた食のつながりを大切にしたい
-
-### Input:
-"""
-
-labeling3 = """
-### Instructions:
-Please summarize the items of groups in one concise sentence with a deeper meaning.
-
-### Conditions:
-Please write in Japanese.
-
-###Input:
-自然や果物、スイーツなど、福島県の得意なところで盛り上げたい
-コミュニティが小さくなるから、効率的で地元に根付いた食のつながりを大切にしたい
-###Output:
-福島県の自然や果物を活かした地産地消のつながりを作って、人が減っても活気ある地域にしたい
-
-###Input:
-街並みとか座禅とか、歴史がある京都でしか味わえない体験が好き
-歴史が好きな彼女を喜ばせたい
-###Output:
-京都の散策だったり座禅などで、歴史がある土地じゃないとできない体験を彼女と一緒にしたい
-
-###Input:
-漫画をアニメ化しても、原作から全く違うのになってしまうのが気に食わない
-感動して泣けるような漫画がすきだ
-###Output:
-アニメでは表せない、漫画にしかない感動の体験がある
-
-### Input:
-"""
-
-labeling4 = """
-### Instructions:
-Please summarize the items of groups in one concise sentence with a deeper meaning.
-
-### Conditions:
-Please write in Japanese.
-
-###Input:
-福島県の自然や果物を活かした地産地消のつながりを作って、人が減っても活気ある地域にしたい
-京都の散策だったり座禅などで、歴史がある土地じゃないとできない体験を彼女と一緒にしたい
-###Output:
-自然とか食、歴史だったり、その土地でしか味わえない体験に興味があり、自分もそんな地域づくりがしたい
-
-###Input:
-将来にとって意味がある本当の学びは、年に関係なく誰にとっても重要
-スポーツの面白さは、その競技が上手か下手かという以外にもあるのではないか
-障碍者もちゃんと給料をもらって生活できる社会にすべきだ
-###Output:
-年齢とか障害、競技のレベルなどの常識は関係なしに、ガチの未来を切り開く必要がある
-
-### Input:
-"""
-
-labeling5 = """
-### Instructions:
-Please summarize the items of groups in one concise sentence with a deeper meaning.
-
-### Conditions:
-Please write in Japanese.
-
-###Input:
-自然や食、歴史など、その土地ならではの結びつきや体験に興味があり、自分もそんな地域づくりがしたい
-おじいちゃんの住む沖縄の陽気な雰囲気が好きだ
-###Output:
-その土地土が持ってる歴史や自然、食文化や雰囲気を、自分で楽しみみんなに広めたい
-
-###Input:
-年齢とか障害、競技のレベルといった常識に捉われず、本当の未来を切り開いていく必要がある
-ウクライナとロシアの戦争はどうすれば解決するだろうか
-###Output:
-常識の枠をぶち破ってでも、マジで大切な行動を起こして、平和な未来を目指したい
-
-### Input:
-"""
 
 symbol = """
 ### Instructions:
@@ -828,8 +686,10 @@ def select_style():
     style_choice = st.sidebar.radio("文章化のスタイル:", ("カジュアル", "フォーマル"))
     if style_choice == "カジュアル":
         style = "casual"
+        sytle_prompt = "Write in a casual manner."
     else:
         style = "formal"
+        sytle_prompt = "Please write in a formal manner."
     return style
 
 def get_answer(llm, messages):
@@ -1380,6 +1240,7 @@ def main():
         #     st.session_state.costs.append(cost)
 
         if grouping_button and user_input:
+
             group_list = get_init_list(user_input)
             number_of_items = len(group_list)
             print(number_of_items)
