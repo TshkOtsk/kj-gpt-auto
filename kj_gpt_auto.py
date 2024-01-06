@@ -1375,7 +1375,7 @@ def main():
                 # lines = count_newlines(user_input)
 
                 # ラベル集めのためのllmセッティング
-                llm_group = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.4, model_name="gpt-4-1106-preview")
+                llm_group = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.5, model_name="gpt-4-1106-preview")
 
                 if translated_theme is None:
                     translated_theme = theme_translate(user_theme,st.session_state["openai_api_key"])
