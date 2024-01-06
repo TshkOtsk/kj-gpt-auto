@@ -1370,13 +1370,13 @@ def main():
             break_point = 7
             if number_of_items <= 20:
                 break_point = 5
+
+            # ラベル集めのためのllmセッティング
+            llm_group = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.3, model_name="gpt-4-1106-preview")
+
             # 項目数がbreak_pointより少なくなるまでラベル集めをループする
             while number_of_items > break_point:
                 # lines = count_newlines(user_input)
-
-                # ラベル集めのためのllmセッティング
-                llm_group = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.5, model_name="gpt-4-1106-preview")
-
                 if translated_theme is None:
                     translated_theme = theme_translate(user_theme,st.session_state["openai_api_key"])
                 prompt_ptrn = prompt_grouping(number_of_items, translated_theme)
