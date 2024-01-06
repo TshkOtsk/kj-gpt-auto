@@ -9,9 +9,12 @@ from langchain.schema import (
 )
 from langchain.callbacks import get_openai_callback
 
+import os
 import re
 import urllib.parse
 import random
+import time
+import datetime
 
 import requests
 
@@ -19,6 +22,8 @@ from datasets.download import DownloadManager
 from datasets import load_dataset
 from sentence_transformers import SentenceTransformer
 import faiss
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 theme = ""
 prompt_ptrn = ""
@@ -605,32 +610,31 @@ Please write in Japanese.
 
 symbol = """
 ### Instructions:
-Act as an introspective artist who excels at looking deep into his or her own mind.
-Paraphrase each group of sentences in a single word that can be understood instantaneously.
+Paraphrase each group of sentences in a couple of words that can be understood instantaneously.
 
 ### Conditions:
 Please write in Japanese.
-Rephrase it with an adjective, verb or metaphor in Japanese.
+Rephrase it with an adjective, verb or metaphor.
 
 ###Input:
 その土地土地が持つ歴史や自然環境、食文化や雰囲気などを、自分から楽しみ、そして広めたい
 ###Output:
-地域独特の風土をフルで楽しむ
+地域独特の風土
 
 ###Input:
 すでにある枠組みをはみ出してでも、本当に大切な行動を起こし、平和な未来を目指したい
 ###Output:
-常識をはみ出した大切な行動をしたい
+常識をはみ出した大切な行動
 
 ###Input:
 アニメでは表せない、漫画にしかない感動の体験がある
 ###Output:
-漫画ならではの感動がある
+漫画ならではの感動
 
 ###Input:
 イラストをiPadで描くのが得意
 ###Output:
-デジタルアートが得意
+デジタルアート
 
 ### Input:
 """
@@ -666,6 +670,8 @@ def init_messages():
         st.session_state.costs = []
 
         st.session_state["openai_api_key"] = ""
+
+        st.session_state["labeling_pair"] = ""
 
         st.session_state["markdown_text"] = ""
 
@@ -715,8 +721,8 @@ def get_list(data):
     temp = []
 
     for line in lines:
-        # ”グループ”もしくは"単独"の行の場合、tempをリセット
-        if "グループ" in line or "単独" in line:
+        # ”グループ”もしくは"単独"または"単品"の行の場合、tempをリセット
+        if "グループ" in line or "単独" in line or "単品" in line:
             if temp:
                 if len(temp) == 1:
                     result.append(temp[0])
@@ -830,12 +836,14 @@ def split_by_hashes(text):
 
     # マッチング結果をリストに格納
     matches_hashes = [re.findall(p, text, re.MULTILINE) for p in pattern_hashes]
+    print("matches_hashes", matches_hashes)
 
     # '**' で挟まれたテキストから "(数字)" を除外して抽出する正規表現パターン
     pattern_bold_text_excluding_numbers = r"\*\*\(\d+\) (.+?)\*\*"
 
     # マッチング結果をリストに格納
     matches_bold_text_excluding_numbers = re.findall(pattern_bold_text_excluding_numbers, text)
+    print("matches_bold_text_excluding_numbers", matches_bold_text_excluding_numbers)
 
     # セクションを辞書として関連付ける
     related_sections = {}
@@ -867,6 +875,148 @@ def split_by_hashes(text):
 
     return related_sections
 
+def split_by_hashes_chart(text):
+    # テキストを行ごとに分割
+    lines = text.split('\n')
+    lines = [item for item in lines if item != ""]
+    numbers_of_lines = len(lines)
+
+    # 整理された構造を保持するための辞書
+    organized_structure = {}
+
+    # numbers_of_lines が 2 以下の場合の特別な処理
+    if numbers_of_lines <= 2:
+        if lines:
+            bold_section = lines[0].strip('*')
+            header = lines[1] if len(lines) > 1 else None
+            organized_structure[bold_section] = header if header else bold_section
+        return organized_structure
+
+    # 現在のボールドセクションとヘッダーを保持するための変数
+    current_bold_section = None
+    current_headers = [None] * 7  # 7レベルのヘッダーに対応
+
+    # 各行を繰り返し処理
+    for line in lines:
+        # ボールドセクションのチェック
+        if line.startswith('**') and line.endswith('**'):
+            current_bold_section = line.strip('*')
+            organized_structure[current_bold_section] = {}
+            current_headers = [None] * 7  # ヘッダーをリセット
+        elif current_bold_section:
+            # ヘッダーレベルを判定
+            header_level = line.count('#')
+            if header_level > 0:
+                current_headers[header_level - 1] = line
+                for i in range(header_level, 7):
+                    current_headers[i] = None
+
+                for i in range(header_level - 2, -1, -1):
+                    if current_headers[i]:
+                        if current_headers[i] not in organized_structure[current_bold_section]:
+                            organized_structure[current_bold_section][current_headers[i]] = []
+                        organized_structure[current_bold_section][current_headers[i]].append(line)
+                        break
+
+    return organized_structure
+
+def parse_markdown_with_bold(md_text):
+    """マークダウンテキストを解析し、レベル数を追加する関数"""
+    lines = md_text.strip().split("\n")
+    parsed_content = []
+
+    for line in lines:
+        # 太字で書かれた行を識別（レベル0）
+        if line.startswith("**") and line.endswith("**"):
+            content = line.strip("* ").strip()
+            parsed_content.append((0, content))
+        # 見出しレベルを判定
+        elif line.startswith("#"):
+            level = line.count("#")
+            content = line.strip("# ").strip()
+            parsed_content.append((level, content))
+    
+    return parsed_content
+
+# def add_shape(api_key, board_id, level, text, x, y):
+#     url = f"https://api.miro.com/v2/boards/{board_id}/shapes"
+
+#     payload = {
+#         "data": {
+#             "content": text,
+#             "shape": "rectangle"
+#         },
+#         "position": {
+#             "x": x,
+#             "y": y
+#     }
+#     }
+#     headers = {
+#         "accept": "application/json",
+#         "content-type": "application/json",
+#         "authorization": f"Bearer {api_key}"
+#     }
+
+#     response = requests.post(url, json=payload, headers=headers)
+
+#     print(response.text)
+
+# def add_rounded_rectangle(api_key, board_id, x, y, width, height):
+#     url = f"https://api.miro.com/v2/boards/{board_id}/shapes"
+
+#     payload = {
+#         "data": {
+#             "shape": "round_rectangle"
+#         },
+#         "position": {
+#             "x": x,
+#             "y": y
+#         },
+#         "geometry": {
+#             "width": width,
+#             "height": height
+#         },
+#         "style": {
+#             "borderColor": "#000000",
+#             "borderWidth": 2,
+#         }
+#     }
+#     headers = {
+#         "accept": "application/json",
+#         "content-type": "application/json",
+#         "authorization": f"Bearer {api_key}"
+#     }
+
+#     response = requests.post(url, json=payload, headers=headers)
+
+#     print(response.text)
+#     print(f"角丸四角形のシェイプが位置({x}, {y})に幅{width}、高さ{height}で作成されました")
+
+
+# def add_shape_to_miro(api_key, board_id, text, x, y):
+#     url = f"https://api.miro.com/v2/boards/{board_id}/shapes"
+
+#     payload = {
+#         "data": {
+#             "content": text,
+#             "shape": "rectangle"
+#         },
+#         "position": {
+#             "x": x,
+#             "y": y
+#     }
+#     }
+#     headers = {
+#         "accept": "application/json",
+#         "content-type": "application/json",
+#         "authorization": f"Bearer {api_key}"
+#     }
+
+#     response = requests.post(url, json=payload, headers=headers)
+
+#     print(response.text)
+
+
 def sentence_generating(llm,group,translated_theme,summarized_list,openai_api_key,style):
     combined_list = []
     # simplified_list = []
@@ -891,13 +1041,12 @@ def sentence_generating(llm,group,translated_theme,summarized_list,openai_api_ke
 ### Instructions:
 {translated_theme}
 Act as an introspective person who excels at looking deep into his or her own mind.
-Please write sentences that connect the following bullet points.
+Make bulleted items into creative sentences by supplementing them with conjunctions.
 
 ### Condition:
 Please write in Japanese.
 Any additional explanations should be enclosed in parentheses.
-Start writing so that it connects logically with the following sentences.
-{last_answer_summarized}
+Please unify the writing style in the Japanese standard form, like as "〜だ" or "〜である".
 
 ### Input:
 # 未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要だ
@@ -907,24 +1056,23 @@ Start writing so that it connects logically with the following sentences.
 ### 未来の社会を発展させるような意味ある勉強がしたい
 
 ### Output:
-例えば、宿題が多すぎて課題をこなすだけになっているのが嫌だ。（答えのある問題をただ強制的に解答させられるのは無駄だと思う。インターネットやChatGPTなどが急速に発展しているので、そういった単なる暗記や論理計算は、そのうち人間がやる必要はなくなると思う。それなのに、このまま偏差値至上主義の詰め込み教育で今後もやっていくならば、何の役にも立たない大人を育てることになるだろう。）
+宿題が多すぎて課題をこなすだけになっているのが嫌だ。（答えのある問題をただ強制的に解答させられるのは無駄だと思う。インターネットやChatGPTなどが急速に発展しているので、そういった単なる暗記や論理計算は、そのうち人間がやる必要はなくなると思う。それなのに、このまま偏差値至上主義の詰め込み教育で今後もやっていくならば、何の役にも立たない大人を育てることになるだろう。）
 そうではなくて、もっと未来の社会を発展させるような意味ある勉強がしたい。（答えのない問いに試行錯誤しながら立ち向かったり、自分だけの特別な興味関心を育てて専門性を高めたりする勉強の方が今後求められるのは明らかだ。）つまり、目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたいということ。そしてそのためには、子どもだけじゃなく大人の教育も必要だと思う。
-（そもそも今の教師が昔ながらの詰め込み式の教育で育ったので、その意識改革が必要だ。教師自身が答えのない自分の心の底から出てきた問いを設定し、生徒と一緒にそれに取り組む姿勢を見せないと、子供達はついていかない。それだけではなく、子供の親たちも新しい学びを人生に取り入れなければならない。答えのない探究活動は従来の学習に比べて、より日常生活に深く関わるものだ。普段過ごしている中で感じる疑問や違和感などを起点にした、実体験に即した問いであるほど、今後の長い人生で取り組むに値する深いものになりやすい。なので、これまでのように親が教育を学校や塾に任せっぱなしにして、家庭で子供に無関心でいては子供の探究心が育ちにくくなる。教師と同じように、親たちも自分の問いを立ててそれを追求する営みを実際にやるべきだ。そして、その行動が子供たちを感化させ、家庭を活気づかせて、さらには職場のパフォーマンスも上げることになるのが理想だ。）これらをまとめると、未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要なのだと言える。
+（そもそも今の教師が昔ながらの詰め込み式の教育で育ったので、その意識改革が必要だ。教師自身が答えのない自分の心の底から出てきた問いを設定し、生徒と一緒にそれに取り組む姿勢を見せないと、子供達はついていかない。（それだけではなく、）子供の親たちも新しい学びを人生に取り入れなければならない。答えのない探究活動は従来の学習に比べて、より日常生活に深く関わるものだ。普段過ごしている中で感じる疑問や違和感などを起点にした、実体験に即した問いであるほど、今後の長い人生で取り組むに値する深いものになりやすい。なので、これまでのように親が教育を学校や塾に任せっぱなしにして、家庭で子供に無関心でいては子供の探究心が育ちにくくなる。教師と同じように、親たちも自分の問いを立ててそれを追求する営みを実際にやるべきだ。そして、その行動が子供たちを感化させ、家庭を活気づかせて、さらには職場のパフォーマンスも上げることになるのが理想だ。）これらをまとめると、未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要なのだと言える。
 
 ### Input:
+（{last_answer_summarized}）
 """
     else:
         sentence = f"""
 ### Instructions:
 {translated_theme}
 Act as an introspective person who excels at looking deep into his or her own mind.
-Please write sentences that connect the bullet points.
+Make bulleted items into creative sentences by supplementing them with conjunctions.
 
 ### Condition:
 Please write in Japanese.
 Any additional explanations should be enclosed in parentheses.
-Start writing so that it connects logically with the following sentences.
-{last_answer_summarized}
 
 ### Input:
 # 未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要だ
@@ -934,19 +1082,27 @@ Start writing so that it connects logically with the following sentences.
 ### 未来の社会を発展させるような意味ある勉強がしたい
 
 ### Output:
-例えば、宿題が多すぎて課題をこなすだけになっているのが嫌だ。（答えがわかってる問題をとけって言われるの、マジないと思う。ネットとかChatGPTとか今の時代めっちゃあるし。それ使えば一瞬だから。そんなことわざわざ人間がやる必要なくね？このまま「偏差値」ばっか言って詰め込みまくったら、将来役に立たない大人になるでしょ。）
-そうではなくて、もっと未来の社会を発展させるような意味ある勉強がしたい。（答えが決まってない問題をめっちゃ考えたり、自分だけ興味がある分野を掘り下げたりした方がめっちゃ楽しいと思うし、それがこれからは大切。）目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたいということ。そしてそのためには、子どもだけじゃなく大人の教育も必要だと思う。
+宿題が多すぎて課題をこなすだけになっているのが嫌だ。（答えがわかってる問題をとけって言われるの、マジないと思う。ネットとかChatGPTとか今の時代めっちゃあるし。それ使えば一瞬だから。そんなことわざわざ人間がやる必要なくね？このまま「偏差値」ばっか言って詰め込みまくったら、将来役に立たない大人になるでしょ。）
+だから、もっと未来の社会を発展させるような意味ある勉強がしたい。（答えが決まってない問題をめっちゃ考えたり、自分だけ興味がある分野を掘り下げたりした方がめっちゃ楽しいと思うし、それがこれからは大切。）目先の宿題を消化するだけではなく、将来の社会に意義のある学びをしたいということ。そしてそのためには、子どもだけじゃなく大人の教育も必要だと思う。
 （ていうか、先生自体が古い詰め込みキョーイクされてきてるんだから、その意識を変えないとダメでしょ。先生が自分でやってないのに、生徒に探究学習をしろとか言っても響かないし。うん。うちの親もそうじゃん。大学試験の面接に必要だからって塾のやってる企業インターンのチラシ持ってくるけど、自分は仕事で何かスキルアップしようとしてんのかな。探究っていつもの生活の中で見つけていくものじゃん。家で過ごすときにそういった環境にないと、いくら学校とか塾でやってもおんなじじゃん。先生も親も自分たちで探究学習ってのをやれば、仕事もプライベートもノリに乗っていい感じになるんじゃないの？それが分かってからじゃないと、子どもたちにも教えることができないと思うけど…。）何が言いたかったかっていうと、つまり、未来にとって意味のある本当の学びは、年齢に関係なく誰にでも重要なんだってこと。
 
 ### Input:
+（{last_answer_summarized}）
 """
 
     print("prompt:", sentence)
 
     st.session_state.messages.append(SystemMessage(content=sentence))
     st.session_state.messages.append(HumanMessage(content=group))
+    last_12_messages = st.session_state.messages[-12:]
+    ai_messages = []
+    for message in last_12_messages:
+        if isinstance(message, AIMessage):
+            ai_messages.append(message)
+    last_messages = ai_messages + st.session_state.messages[-2:]
+    print("last_messages >>>> ", last_messages)
     with st.spinner("KJ-GPTが文章化しています ..."):
-        answer, cost = get_answer(llm, st.session_state.messages[-2:])
+        answer, cost = get_answer(llm, last_messages)
     combined_list.append(answer)
     st.session_state.messages.append(AIMessage(content=answer))
     st.session_state.costs.append(cost)
@@ -981,8 +1137,8 @@ def sumarized_sentence_generating(llm,group,translated_theme,style):
         sentence = f"""
 ### Instructions:
 {translated_theme}
-Act as an introspective artist who excels at looking deep into his or her own mind.
-Please write sentences that connect the following bullet points.
+Act as an introspective person who excels at looking deep into his or her own mind.
+Please write creative sentences that connect the following bullet points.
 
 ### Condition:
 Please write in Japanese.
@@ -1006,11 +1162,11 @@ iPadを使ったイラストの才能を活かし、原作の魅力を損なわ�
 スポーツのプロとアマは、技術力だけでなく、経済的報酬、精神力、専門知識の面でも異なる。ユニフォームのデザインにもその差が現れ、プロは洗練されたものを用い、アマは実用性やコストを重視する傾向にある。
 
 ### Output:
-沖縄の暖かさや福島の自然への愛情は、自分のアイデンティティと深く結びついており、地域の特色を大切にすることは文化や伝統を味わうことへと繋がる。そのため、地域の自然とフルーツを活かしたスイーツで福島県を活性化することや、地域愛や環境への配慮、食品ロス削減などに興味がある。無駄のない、地域に根付いた食文化の重要性を感じ、持続可能な社会を実現したいと考えており、そのためには地域の交通インフラ整備も重要な課題である。若者として、これらの議論に積極的に参加したいと思う。
-このように、過疎化と交通問題を克服し、福島の食文化を活かした地域活性化のビジョンを持つことは、地域の人々と協力し過疎化を食い止め、より良い未来を創る鍵だと確信している。また、彼女の歴史への興味を共有し、京都での座禅体験や古い町並みを通じて、より深い絆を育むことも重要だと考えている。歴史や地域文化に触れることは、私たちの生き方を見つめ直し、より人間らしさに回帰し共に成長する機会を提供する。私自身、生まれ育った地域への深い愛情を持ち、地元の文化や伝統、祭りや行事への参加を通じて共同体の一員としての絆を感じている。この地域愛は、私たちのアイデンティティを育み、未来へ繋げていくべき価値だと理解している。
-またiPadを使ったイラストの才能を活かし、原作の魅力を損なわずに感動を与える作品を創造したいとの思いを持っている。原作の感動をアニメでどう表現するかは大きな課題であるが、デジタルの利点を活かし創造的な試みにより新しい魅力を加え、原作への敬意を保ちつつ感動を再創造したい。それが何らかの形で地域愛の育成につながれば嬉しい。
-国際社会に目を向ければ、ウクライナとロシアの戦争解決は、全体の平和願望を重んじ、実行可能な対話と解決策を模索する必要がある。未来の社会に貢献する意義のある学びへの渇望は、単なる感情ではなく、内面からの強い欲求であり、現教育システムへの疑問と宿題の多さへの不満は、教育の本質を見直す必要性を示唆している。子どもも大人も、年齢に関わらず、常に新しいことを学び続けることが必要であり、障害者も含めたすべての人々が社会において尊重され、能力を発揮できる環境を作ることの重要性を認識している。そうした社会を実現することで、平和な世界を取り戻すことができると考えている。
-共生社会においては、障害者を含め全ての人が、自己の能力を発揮し尊重される環境が求められる。それには、年齢に関係なく意義ある学びが必要であり、それが共生社会の構築に不可欠である。スポーツの世界でも、プロとアマの違いは技術力だけではなく、経済的報酬、精神力、専門知識の面でも異なり、ユニフォームのデザインにもその差が現れている。プロは洗練されたものを用い、アマは実用性やコストを重視する傾向にある。
+沖縄の暖かさや福島の自然への愛情は、自分のアイデンティティと深く結びついており、地域の特色を大切にすることは文化や伝統を味わうことへと繋がる。そのため、地域の自然とフルーツを活かしたスイーツで福島県を活性化することや、地域愛や環境への配慮、食品ロス削減などに興味がある。無駄のない、地域に根付いた食文化の重要性を感じ、持続可能な社会を実現したいと考えており、そのためには地域の交通インフラ整備も重要な課題である。若者として、これらの議論に積極的に参加したいと思う。\n
+このように、過疎化と交通問題を克服し、福島の食文化を活かした地域活性化のビジョンを持つことは、地域の人々と協力し過疎化を食い止め、より良い未来を創る鍵だと確信している。また、彼女の歴史への興味を共有し、京都での座禅体験や古い町並みを通じて、より深い絆を育むことも重要だと考えている。歴史や地域文化に触れることは、私たちの生き方を見つめ直し、より人間らしさに回帰し共に成長する機会を提供する。私自身、生まれ育った地域への深い愛情を持ち、地元の文化や伝統、祭りや行事への参加を通じて共同体の一員としての絆を感じている。この地域愛は、私たちのアイデンティティを育み、未来へ繋げていくべき価値だと理解している。\n
+またiPadを使ったイラストの才能を活かし、原作の魅力を損なわずに感動を与える作品を創造したいとの思いを持っている。原作の感動をアニメでどう表現するかは大きな課題であるが、デジタルの利点を活かし創造的な試みにより新しい魅力を加え、原作への敬意を保ちつつ感動を再創造したい。それが何らかの形で地域愛の育成につながれば嬉しい。\n
+国際社会に目を向ければ、ウクライナとロシアの戦争解決は、全体の平和願望を重んじ、実行可能な対話と解決策を模索する必要がある。未来の社会に貢献する意義のある学びへの渇望は、単なる感情ではなく、内面からの強い欲求であり、現教育システムへの疑問と宿題の多さへの不満は、教育の本質を見直す必要性を示唆している。子どもも大人も、年齢に関わらず、常に新しいことを学び続けることが必要であり、障害者も含めたすべての人々が社会において尊重され、能力を発揮できる環境を作ることの重要性を認識している。そうした社会を実現することで、平和な世界を取り戻すことができると考えている。\n
+共生社会においては、障害者を含め全ての人が、自己の能力を発揮し尊重される環境が求められる。それには、年齢に関係なく意義ある学びが必要であり、それが共生社会の構築に不可欠である。スポーツの世界でも、プロとアマの違いは技術力だけではなく、経済的報酬、精神力、専門知識の面でも異なり、ユニフォームのデザインにもその差が現れている。プロは洗練されたものを用い、アマは実用性やコストを重視する傾向にある。\n
 これらの視点から、私たちは生活の様々な側面において、共生社会を目指し、独自のアイデンティティを育み、地域愛を大事にしながら、持続可能な未来を創造するために努力していく必要がある。
 
 ### Input:
@@ -1019,8 +1175,8 @@ iPadを使ったイラストの才能を活かし、原作の魅力を損なわ�
         sentence = f"""
 ### Instructions:
 {translated_theme}
-Act as an introspective artist who excels at looking deep into his or her own mind.
-Please write sentences that connect the bullet points.
+Act as an introspective person who excels at looking deep into his or her own mind.
+Please write creative sentences that connect the bullet points.
 
 ### Condition:
 Please write in Japanese.
@@ -1041,11 +1197,11 @@ iPadでイラストを描くことの自由さを愛し、心を動かす漫画�
 障碍者も社会で活躍し、平等な報酬を得る権利がある。全員が自身の可能性を最大限に発揮し、教育がその鍵であると考える。
 
 ### Output:
-沖縄と福島が好きで、地元の名産を活かしたスイーツにロマンを感じる。だから、福島の自然とフルーツを使ったご当地スイーツで地域を盛りあげ、フレッシュでユニークな味わいを提供して、観光客をふやしたい。地元で獲れたものを地元で食べて食品ロスを減らしつつ、福島の良さを広めたいと思ってる。その時に交通手段が増えれば、住んでいる町の人ももっと楽しむことができる。このように、過疎化と交通の問題を解決しつつ、食を通じて福島の魅力を伝えて、地域を賑やかにしたい。
-また、歴史好きな彼女と一緒に、京都で座禅体験をしたり、古い町並みを歩いたりするのが楽しみ。こんなこと言うの恥ずかしいけど、歴史への愛と地域活性化への情熱をもって、愛する人との絆も深めたい。
-さらに、iPadでイラストを自由に描くことが好きで、心を動かす漫画にハマっている。原作の魅力を大切にし、アニメ化する時もその素晴らしさを最大限に表現した方がいいと思う。その上で、デジタルの利点を活かした新しい表現を取り入れるべきだと考えている。
-そして、平和を望む心はみんなと同じだけど、それを実現するためには、ただ願うだけでなく具体的な行動が大切だと思う。それが未来のための意味ある学びにつながっていく。でも、今の宿題に追われてる状況には正直うんざりしていて、もっと自分の内面を見つめながら未来に貢献する勉強がしたい。学びは一生続く大切なもので、子どもだけでなく大人にも必要。生きる力や将来に役立つ知識が、本質的な教育の目的だと感じる。
-そうすることで、障碍者も活躍し平等な報酬を得る社会が実現すると思う。みんなが自分の可能性を最大限に発揮するためには、教育がその土台になると思うんだ。
+沖縄と福島が好きで、地元の名産を活かしたスイーツになんとなくロマンを感じるんだよね。だから、福島の自然とフルーツをつかったご当地スイーツで地域をもりあげたい。フレッシュでユニークな味わいで、観光客も地元の人もよろこばせたい。地元で獲れたものを地元で食べて、食品ロスを減らすのが大事なんだ。その時に交通手段が増えれば、住んでいる町の人ももっと楽しむことができる。このように、過疎と交通の問題をなんとかしながら、食べもので福島の魅力を伝えて、地域をにぎやかにできればいいな。\n
+それに、歴史が好きな彼女と一緒に、京都で座禅体験をしたり、古い町並みを歩いたりするのが楽しみ。こんなこと言うの恥ずかしいけど、歴史と地域の情熱をいかして、彼女のことをもっと知りたいんだよね。\n
+あと、iPadでイラストを描くことが好きで、心を動かす漫画に今ハマっている。アニメ化する時も原作の良さをちゃんと表現した方がいいと思う。その上で、デジタルの利点を活かした新しい表現を取り入れるべきなんじゃないかな。\n
+感動する作品はときに平和な世界につながるんじゃないかな。そういった戦争のない世界を望む心はみんなと同じだけど、大切なのはただ願うだけじゃなくて具体的な行動をすること。それが未来のための意味ある学びにつながっていく。でも、今の宿題に追われてる状況には正直うんざりしていて、もっと自分の内面を見つめながら将来につながる勉強がしたい。学びは一生続く大切なもので、子どもだけでなく大人にも必要だもの。生きる力や将来に役立つ知識が、本質的な教育の目的だと思うね。\n
+そうすることで、障碍者も活躍できて平等な報酬を得るような、しあわせな社会が実現すると思う。みんなが自分の可能性を最大限に発揮するためには、教育がその土台になると思うんだ。
 
 ### Input:
 """
@@ -1063,123 +1219,96 @@ iPadでイラストを描くことの自由さを愛し、心を動かす漫画�
     combined_sentences = "".join(combined_list)
     return combined_sentences
 
-def related_sentence_generating(llm,contexts,wiki_text,translated_theme,wiki_extract):
+# def related_sentence_generating(llm,contexts,wiki_text,translated_theme,wiki_extract):
 
-    sentence = f"""
-### Instructions:
-{translated_theme}
-You are an insightful detective.
-Please advise on the next matter to be investigated, using the information on Wikipedia as a springboard for the text summary of your client's request.
-
-### Condition:
-Please write in Japanese.
-Please write in the style of a hard-boiled novel, in a bleak and immediate manner.
-
-### Summary:
-{contexts}
-
-### Wikipedia:
-{wiki_extract}
-{wiki_text}
-"""
-    
-#     detective = """
+#     sentence = f"""
 # ### Instructions:
-# You are an insightful detective.
-# As in the example, write a sentence in the style of a hard-boiled novel about a detective listening to his client and thinking.
+# {translated_theme}
+# You are a poet par excellence.
+# Write an abstract poem, referring to the Wikipedia content and summary text.
 
 # ### Condition:
 # Please write in Japanese.
-# The text should be no more than 30 words.
-# Verbs should be in the present progressive tense.
-# Write from the client's first-person point of view.
+# Explain the poem in a clear and simple way.
+# Please include plenty of line breaks in your poem to make it easier to read.
 
-# ### Example:
-# この探偵はタバコを燻らせながらじっと目を閉じている
+# ### Summary:
+# {contexts}
 
-# ### Example:
-# この探偵は黙って宙を見上げ、真っ白な蛍光灯を見つめている
-
-# ### Example:
-# 大きな背中を微動だにさせず、この探偵はコーヒーをすすって考えている
+# ### Wikipedia:
+# {wiki_text}
 # """
 
-#     st.session_state.messages.append(SystemMessage(content=detective))
-#     with st.spinner("分析中 ..."):
-#         detective_answer, cost = get_answer(llm, st.session_state.messages[-1:])
+#     print("prompt:", sentence)
+
+#     st.session_state.messages.append(SystemMessage(content=sentence))
+#     with st.spinner("検索中 ..."):
+#         answer, cost = get_answer(llm, st.session_state.messages[-1:])
+#     st.session_state.messages.append(AIMessage(content=answer))
 #     st.session_state.costs.append(cost)
+#     return answer
 
-    print("prompt:", sentence)
+# def related_gal_sentence_generating(llm,contexts,wiki_text,translated_theme,wiki_extract):
 
-    st.session_state.messages.append(SystemMessage(content=sentence))
-    # st.session_state.messages.append(HumanMessage(content=group))
-    with st.spinner("探偵が考えています ..."):
-        answer, cost = get_answer(llm, st.session_state.messages[-1:])
-    st.session_state.messages.append(AIMessage(content=answer))
-    st.session_state.costs.append(cost)
-    return answer
+#     sentence = f"""
+# ### Instructions:
+# {translated_theme}
+# You are a Japanese gal attending a vocational school.
+# Read the text summarising the questioner's concerns and advise on the next steps to take, based on information from Wikipedia.
 
-def related_gal_sentence_generating(llm,contexts,wiki_text,translated_theme,wiki_extract):
+# ### Condition:
+# Please write in Japanese.
+# Use the same style of writing as in the examples.
+# Please include three or four of the following emojis in the text in any combination of two of the following emojis.
+# 🙇🏻 💦 ❕　🙏🏻 👏🏻 💕 ✨ 🤍 🏹 👼🏻 💗 🌷 👀 💕 🚶🏻 💨 🤦🏻‍♀️ 💞 🥺 🤭 💡 💖 🙈 💦 😽 ✌🏻 🏃🏻 ➰ 😿 🌀 ❤︎ ‼️ 👍🏻 🕺🏻 ✨ 👩🏻‍❤️‍👩🏻 💞
 
-    sentence = f"""
-### Instructions:
-{translated_theme}
-You are a Japanese gal attending a vocational school.
-Read the text summarising the questioner's concerns and advise on the next steps to take, based on information from Wikipedia.
+# ### Example:
+# 相談者さんへ🌷
+# 質問してくれてありがと🥺
+# めっちゃいいこと考えててリスペクト🫶🏻
+# 返信おくれたけどゆるしてネ
+# ウィキペディアは初ナースちゃんだよ🖤
+# はずかしくて家で一瞬着ただけ(＾＾)
+# 相談者さんはハロウィンどっかいった？？
 
-### Condition:
-Please write in Japanese.
-Use the same style of writing as in the examples.
-Please include three or four of the following emojis in the text in any combination of two of the following emojis.
-🙇🏻 💦 ❕　🙏🏻 👏🏻 💕 ✨ 🤍 🏹 👼🏻 💗 🌷 👀 💕 🚶🏻 💨 🤦🏻‍♀️ 💞 🥺 🤭 💡 💖 🙈 💦 😽 ✌🏻 🏃🏻 ➰ 😿 🌀 ❤︎ ‼️ 👍🏻 🕺🏻 ✨ 👩🏻‍❤️‍👩🏻 💞
+# ### Summary:
+# {contexts}
 
-### Example:
-相談者さんへ🌷
-質問してくれてありがと🥺
-めっちゃいいこと考えててリスペクト🫶🏻
-返信おくれたけどゆるしてネ
-ウィキペディアは初ナースちゃんだよ🖤
-はずかしくて家で一瞬着ただけ(＾＾)
-相談者さんはハロウィンどっかいった？？
+# ### Wikipedia:
+# {wiki_extract}
+# {wiki_text}
+# """
+#     print("prompt:", sentence)
 
-### Summary:
-{contexts}
+#     st.session_state.messages.append(SystemMessage(content=sentence))
+#     # st.session_state.messages.append(HumanMessage(content=group))
+#     with st.spinner("返信を待っています ..."):
+#         answer, cost = get_answer(llm, st.session_state.messages[-1:])
+#     st.session_state.messages.append(AIMessage(content=answer))
+#     st.session_state.costs.append(cost)
+#     return answer
 
-### Wikipedia:
-{wiki_extract}
-{wiki_text}
-"""
-    print("prompt:", sentence)
+# @st.cache_resource
+# def load_wiki():
+#     # wikipedia 日本語データセットのロード
+#     wikija_dataset = load_dataset(
+#         path="singletongue/wikipedia-utils",
+#         name="passages-c400-jawiki-20230403",
+#         split="train",
+#     )
+#     # faiss index のダウンロード
+#     dm = DownloadManager()
+#     index_local_path = dm.download(
+#         f"https://huggingface.co/datasets/hotchpotch/wikipedia-passages-jawiki-embeddings/resolve/main/faiss_indexes/passages-c400-jawiki-20230403/sup-simcse-ja-base/index_IVF2048_PQ192.faiss"
+#     )
+#     # faiss index のロード
+#     faiss_index = faiss.read_index(index_local_path)
 
-    st.session_state.messages.append(SystemMessage(content=sentence))
-    # st.session_state.messages.append(HumanMessage(content=group))
-    with st.spinner("返信を待っています ..."):
-        answer, cost = get_answer(llm, st.session_state.messages[-1:])
-    st.session_state.messages.append(AIMessage(content=answer))
-    st.session_state.costs.append(cost)
-    return answer
+#     # embeddings へ変換するモデルのロード
+#     model = SentenceTransformer("cl-nagoya/sup-simcse-ja-base")
+#     model.max_seq_length = 512
 
-@st.cache_resource
-def load_wiki():
-    # wikipedia 日本語データセットのロード
-    wikija_dataset = load_dataset(
-        path="singletongue/wikipedia-utils",
-        name="passages-c400-jawiki-20230403",
-        split="train",
-    )
-    # faiss index のダウンロード
-    dm = DownloadManager()
-    index_local_path = dm.download(
-        f"https://huggingface.co/datasets/hotchpotch/wikipedia-passages-jawiki-embeddings/resolve/main/faiss_indexes/passages-c400-jawiki-20230403/sup-simcse-ja-base/index_IVF2048_PQ192.faiss"
-    )
-    # faiss index のロード
-    faiss_index = faiss.read_index(index_local_path)
-
-    # embeddings へ変換するモデルのロード
-    model = SentenceTransformer("cl-nagoya/sup-simcse-ja-base")
-    model.max_seq_length = 512
-
-    return wikija_dataset, faiss_index, model
+#     return wikija_dataset, faiss_index, model
 
 def messages_init():
     st.session_state.messages = [
@@ -1195,13 +1324,17 @@ def main():
 
     style = select_style()
 
-    # OpenAI API Keyの入力
-    with st.form("my_api_key", clear_on_submit=True):
-        openai_api_key = st.text_input("OpenAI API Key", type="password")
-        api_key_button = st.form_submit_button(label="Enter")
-    
-        if api_key_button and openai_api_key:
-            st.session_state["openai_api_key"] = openai_api_key
+    if not OPENAI_API_KEY:
+        # OpenAI API Keyの入力
+        with st.form("my_api_key", clear_on_submit=True):
+            openai_api_key = st.text_input("OpenAI API Key", type="password")
+            api_key_button = st.form_submit_button(label="Enter")
+        
+            if api_key_button and openai_api_key:
+                st.session_state["openai_api_key"] = openai_api_key
+    else:
+        openai_api_key = OPENAI_API_KEY
+        st.session_state["openai_api_key"] = openai_api_key
     
     if openai_api_key:
         llm = select_model(st.session_state["openai_api_key"])
@@ -1224,20 +1357,7 @@ def main():
     with container:
         with st.form(key="my_form", clear_on_submit=False):
             user_input = st.text_area(label="項目ラベル: ", key="input", height=300)
-            
-            # generating_button = st.form_submit_button(label="項目自動生成")
             grouping_button = st.form_submit_button(label="データを統合")
-            # labeling_button = st.form_submit_button(label="表札づくり")
-            # symbol_button = st.form_submit_button(label="シンボル作成")
-
-        # if generating_button and user_theme:
-        #     prompt_ptrn = data_generating(user_theme,st.session_state["openai_api_key"])
-        #     st.session_state.messages.append(SystemMessage(content=prompt_ptrn))
-        #     st.session_state.messages.append(HumanMessage(content=user_input))
-        #     with st.spinner("KJ-GPTが元データを生成しています ..."):
-        #         answer, cost = get_answer(llm, st.session_state.messages[-2:])
-        #     st.session_state.messages.append(AIMessage(content=answer))
-        #     st.session_state.costs.append(cost)
 
         if grouping_button and user_input:
 
@@ -1247,15 +1367,23 @@ def main():
             labeling_pair = []
             dict = {}
             count = 1
-            while number_of_items > 5:
+            break_point = 7
+            if number_of_items <= 20:
+                break_point = 5
+            # 項目数がbreak_pointより少なくなるまでラベル集めをループする
+            while number_of_items > break_point:
                 # lines = count_newlines(user_input)
+
+                # ラベル集めのためのllmセッティング
+                llm_group = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.3, model_name="gpt-4-1106-preview")
+
                 if translated_theme is None:
                     translated_theme = theme_translate(user_theme,st.session_state["openai_api_key"])
                 prompt_ptrn = prompt_grouping(number_of_items, translated_theme)
                 st.session_state.messages.append(SystemMessage(content=prompt_ptrn))
                 st.session_state.messages.append(HumanMessage(content=user_input))
                 with st.spinner(f"KJ-GPTがラベルを集めています（{count}回目：残りラベル数{number_of_items}） ..."):
-                    answer, cost = get_answer(llm, st.session_state.messages[-2:])
+                    answer, cost = get_answer(llm_group, st.session_state.messages[-2:])
                 st.session_state.messages.append(AIMessage(content=answer))
                 st.session_state.costs.append(cost)
                 group_list = get_list(answer)
@@ -1272,10 +1400,14 @@ def main():
                             prompt_ptrn = labeling4
                         else:
                             prompt_ptrn = labeling5
+
+                        # 表札づくりのためのllmセッティング
+                        llm_label = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.7, model_name="gpt-4-1106-preview")
+
                         st.session_state.messages.append(SystemMessage(content=prompt_ptrn))
                         st.session_state.messages.append(HumanMessage(content=group_string))
                         with st.spinner("KJ-GPTが表札を考えています ..."):
-                            answer, cost = get_answer(llm, st.session_state.messages[-2:])
+                            answer, cost = get_answer(llm_label, st.session_state.messages[-2:])
                         group_list.append(answer)
                         dict = {answer: group}
                         labeling_pair.append(dict)
@@ -1290,6 +1422,10 @@ def main():
                 # result = st.text_area(label=f"{count}回目の結果: ", key=f"result{count}", value=group_list_str, height=300)
                 count += 1
                 number_of_items = len(group_list)
+
+            # ラベルのペアをsession_stateに格納
+            st.session_state["labeling_pair"] = labeling_pair
+
             # symbol_input_list = get_list(user_input)
             # print("symbol_input_list:", symbol_input_list)
             top_items = []
@@ -1323,8 +1459,6 @@ def main():
                 symbol_count += 1
 
             symbol_str = "\n".join(symbol_sets)
-            # st.text_area(label="シンボル: ", value=symbol_str, key="final_result", height=300)
-            # st.text_area(label="辞書: ", value=labeling_pair, key="final_dict", height=300)
 
             markdown_text = ""
 
@@ -1343,11 +1477,428 @@ def main():
 
             converted_markdown = headline_to_list(markdown_text)
             st.markdown(converted_markdown)
-            
-            # st.text_area(label="Mark down: ", value=markdown_text, key="markdown", height=450)
 
-            # st.text_area(label="階層化データ: ", key="layered_data", value=markdown_text, height=300)
-    
+    # chart_container = st.container()
+    # with chart_container:
+    #     with st.form(key="my_chart", clear_on_submit=False):
+    #         if "markdown_text" not in st.session_state:
+    #             st.session_state["markdown_text"] = ""
+    #         labels_all = st.text_area(label="ラベルのペア: ", key="labels_all", value=st.session_state["markdown_text"], height=300)
+    #         miro_teamId = st.text_input("Miro チームID", type="password")
+    #         sentence_button = st.form_submit_button(label="データを図解化")
+
+    #     if sentence_button and labels_all and miro_teamId:
+
+    #         parsed_markdown = parse_markdown_with_bold(labels_all)
+    #         print(parsed_markdown)
+
+    #         api_token = ""
+
+    #         boardId = ""
+            
+    #         # 各要素のレベルとそのxy座標を保管するためのデータ構造
+    #         element_positions = []
+
+    #         # シェイプをボードに追加
+    #         x_position = 0
+    #         y_position = 0
+    #         previous_level = -1
+    #         previous_x_position = 0  # 前の要素のx座標
+    #         highest_level = 0
+    #         level_y_positions = {0: 0, 1: 240, 2: 360, 3: 480, 4: 600, 5: 720, 6: 840, 8: 960}  # 各レベルの最新のy座標
+
+    #         for level, text in parsed_markdown:
+    #             if level > highest_level:
+    #                 highest_level = level
+    #             if level > previous_level:
+    #                 # レベルが上がったら、前の要素のx座標を引き継ぎ、y座標を更新
+    #                 x_position = previous_x_position
+    #                 y_position = level_y_positions[level]
+    #             elif level < previous_level:
+    #                 if level != 0:
+    #                     # レベルが下がったら、前の要素のx座標から240動かし、y軸を並行にする
+    #                     x_position = previous_x_position + 240
+    #                 else:
+    #                     # レベルが下がり、かつレベルが0の時、前の要素のx座標から360動かし、y軸を並行にする
+    #                     x_position = previous_x_position + 360
+    #                 y_position = level_y_positions[level]
+    #             elif level == previous_level:
+    #                 # 同じレベルの場合、x座標のみ120増やす
+    #                 x_position += 120
+
+    #             # シェイプを作成
+    #             add_shape(api_token, boardId, level, text, x_position, y_position)
+
+    #             # この要素の情報をデータベースに追加
+    #             element_positions.append({"level": level, "x": x_position, "y": y_position})
+
+    #             # x座標とy座標を更新
+    #             level_y_positions[level] = y_position
+    #             previous_x_position = x_position
+    #             previous_level = level
+
+
+    #         print("element_positions >>>>", element_positions)
+    #         # 結果の表示
+    #         for element in element_positions:
+    #             print(f"レベル {element['level']} の要素が位置 ({element['x']}, {element['y']}) に追加されました。")
+
+    #         # レベル0ごとの四角形を計算するための変数
+    #         start_x = 0
+    #         max_y = 0
+    #         max_x = 0
+
+    #         # 各レベル0ごとに四角形を計算して追加
+    #         for element in element_positions:
+    #             level = element['level']
+    #             x, y = element['x'], element['y']
+
+    #             # 最大のx座標とy座標を更新
+    #             max_x = max(max_x, x)
+    #             max_y = max(max_y, y)
+
+    #             if level == 0 and x != start_x:
+    #                 # 前のレベル0から現在のレベル0までの範囲の四角形を計算
+    #                 width = max_x - start_x - 120
+    #                 height = max_y + 120
+    #                 frame_x = start_x + ( width - 120 ) / 2 
+    #                 frame_y = ( height - 120 ) / 2
+
+    #                 # 四角形を追加
+    #                 add_rounded_rectangle(api_token, boardId, frame_x, frame_y, width, height)
+
+    #                 # 新しいレベル0の開始点を設定
+    #                 start_x = x
+    #                 max_x = x
+    #                 max_y = 0
+
+    #         # 最後の範囲の四角形を計算して追加
+    #         width = max_x - start_x + 120
+    #         height = max_y + 120
+    #         frame_x = start_x + ( width - 120 ) / 2 
+    #         frame_y = ( height - 120 ) / 2
+    #         add_rounded_rectangle(api_token, boardId, frame_x, frame_y, width, height)
+
+
+    #         # レベル1ごとの四角形を作成
+    #         # 1以上の要素のみ抽出
+    #         level_1_or_higher = [item for item in parsed_markdown if item[0] >= 1]
+
+    #         # levelの値が1以上の要素を抽出
+    #         elements_level_1_or_higher = [item for item in element_positions if item['level'] >= 1]
+
+    #         # リストをタプルの形に変換
+    #         tuple_list_positions_1_or_higher = [(item['level'], item['x'], item['y']) for item in elements_level_1_or_higher]
+
+    #         if highest_level == 2:
+    #             # 2が出現する最後の項目までのリストを生成
+    #             last_two_index = None
+    #             for i, (level, _, _) in enumerate(tuple_list_positions_1_or_higher):
+    #                 if level == 2:
+    #                     last_two_index = i
+
+    #             # last_two_indexがNoneでなければ、最後の2までのリストをスライスする
+    #             if last_two_index is not None:
+    #                 result_list = tuple_list_positions_1_or_higher[:last_two_index + 1]
+    #             else:
+    #                 result_list = tuple_list_positions_1_or_higher  # 2がない場合は元のリストをそのまま使用
+
+    #             tuple_list_positions_1_or_higher = result_list
+
+    #         # レベル1ごとの四角形を計算するための変数
+    #         level1_start_x = 0
+    #         level1_max_x = 0
+    #         level1_max_y = 0
+
+    #         # 各レベル1ごとに四角形を計算して追加
+    #         for level, x, y in tuple_list_positions_1_or_higher:
+    #             # 最大のx座標とy座標を更新
+    #             if level >= 1:
+    #                 level1_max_x = max(level1_max_x, x)
+    #                 level1_max_y = max(level1_max_y, y)
+
+    #             if level == 1 and x != level1_start_x:
+    #                 # レベル1の区間の四角形を計算
+    #                 width = level1_max_x - level1_start_x - 120
+    #                 height = level1_max_y - 240 + 120  # y座標の基準点は240
+    #                 frame_x = level1_start_x + ( width - 120 ) / 2
+    #                 frame_y = 240 + ( height - 120 ) / 2  # y座標の基準点を加算
+
+    #                 # 子要素がある場合のみ四角形を追加（四角形の高さが120の場合は追加しない）
+    #                 if height != 120:
+    #                     # 四角形を追加
+    #                     add_rounded_rectangle(api_token, boardId, frame_x, frame_y, width, height)
+
+    #                 # 新しいレベル1の開始点を設定
+    #                 level1_start_x = x
+    #                 level1_max_x = x
+    #                 level1_max_y = 240  # y座標の基準点をリセット
+
+    #         # 最後の範囲の四角形を計算して追加（レベル1が最後に現れた場合）
+    #         if level1_max_x > level1_start_x:
+    #             width = level1_max_x - level1_start_x + 120
+    #             height = level1_max_y - 240 + 120  # y座標の基準点は240
+    #             frame_x = level1_start_x + ( width - 120 ) / 2
+    #             frame_y = 240 + ( height - 120 ) / 2  # y座標の基準点を加算
+    #             add_rounded_rectangle(api_token, boardId, frame_x, frame_y, width, height)
+
+
+    #         # レベル2ごとの四角形を作成
+    #         # 2以上の要素のみ抽出
+    #         level_2_or_higher = [item for item in parsed_markdown if item[0] >= 2]
+
+    #         # levelの値が2以上の要素を抽出
+    #         elements_level_2_or_higher = [item for item in element_positions if item['level'] >= 2]
+
+    #         # リストをタプルの形に変換
+    #         tuple_list_positions_2_or_higher = [(item['level'], item['x'], item['y']) for item in elements_level_2_or_higher]
+
+    #         if highest_level == 3:
+    #             # 3が出現する最後の項目までのリストを生成
+    #             last_three_index = None
+    #             for i, (level, _, _) in enumerate(tuple_list_positions_2_or_higher):
+    #                 if level == 3:
+    #                     last_three_index = i
+
+    #             # last_three_indexがNoneでなければ、最後の3までのリストをスライスする
+    #             if last_three_index is not None:
+    #                 result_list = tuple_list_positions_2_or_higher[:last_three_index + 1]
+    #             else:
+    #                 result_list = tuple_list_positions_2_or_higher  # 3がない場合は元のリストをそのまま使用
+
+    #             tuple_list_positions_2_or_higher = result_list
+
+    #         # レベル2ごとの四角形を計算するための変数
+    #         level2_start_x = 0
+    #         level2_max_x = 0
+    #         level2_max_y = 0
+
+    #         # 各レベル2ごとに四角形を計算して追加
+    #         for level, x, y in tuple_list_positions_2_or_higher:
+    #             # 最大のx座標とy座標を更新
+    #             if level >= 2:
+    #                 level2_max_x = max(level2_max_x, x)
+    #                 level2_max_y = max(level2_max_y, y)
+
+    #             if level == 2 and x != level2_start_x:
+    #                 # レベル2の区間の四角形を計算
+    #                 width = level2_max_x - level2_start_x - 120
+    #                 height = level2_max_y - 360 + 120  # y座標の基準点は360
+    #                 frame_x = level2_start_x + ( width - 120 ) / 2
+    #                 frame_y = 360 + ( height - 120 ) / 2  # y座標の基準点を加算
+
+    #                 # 子要素がある場合のみ四角形を追加（四角形の高さが120の場合は追加しない）
+    #                 if height != 120:
+    #                     # 四角形を追加
+    #                     add_rounded_rectangle(api_token, boardId, frame_x, frame_y, width, height)
+
+    #                 # 新しいレベル2の開始点を設定
+    #                 level2_start_x = x
+    #                 level2_max_x = x
+    #                 level2_max_y = 360  # y座標の基準点をリセット
+
+    #         # 最後の範囲の四角形を計算して追加（レベル2が最後に現れた場合）
+    #         if level2_max_x > level2_start_x:
+    #             width = level2_max_x - level2_start_x + 120
+    #             height = level2_max_y - 360 + 120  # y座標の基準点は360
+    #             frame_x = level2_start_x + ( width - 120 ) / 2
+    #             frame_y = 360 + ( height - 120 ) / 2  # y座標の基準点を加算
+    #             add_rounded_rectangle(api_token, boardId, frame_x, frame_y, width, height)
+
+            
+    #         # レベル3ごとの四角形を作成
+    #         # 3以上の要素のみ抽出
+    #         level_3_or_higher = [item for item in parsed_markdown if item[0] >= 3]
+
+    #         # levelの値が3以上の要素を抽出
+    #         elements_level_3_or_higher = [item for item in element_positions if item['level'] >= 3]
+
+    #         # リストをタプルの形に変換
+    #         tuple_list_positions_3_or_higher = [(item['level'], item['x'], item['y']) for item in elements_level_3_or_higher]
+
+    #         if highest_level == 4:
+    #             # 4が出現する最後の項目までのリストを生成
+    #             last_four_index = None
+    #             for i, (level, _, _) in enumerate(tuple_list_positions_3_or_higher):
+    #                 if level == 4:
+    #                     last_four_index = i
+
+    #             # last_four_indexがNoneでなければ、最後の4までのリストをスライスする
+    #             if last_four_index is not None:
+    #                 result_list = tuple_list_positions_3_or_higher[:last_four_index + 1]
+    #             else:
+    #                 result_list = tuple_list_positions_3_or_higher  # 4がない場合は元のリストをそのまま使用
+
+    #             tuple_list_positions_3_or_higher = result_list
+
+    #         # レベル3ごとの四角形を計算するための変数
+    #         level3_start_x = 0
+    #         level3_max_x = 0
+    #         level3_max_y = 0
+
+    #         # 各レベル3ごとに四角形を計算して追加
+    #         for level, x, y in tuple_list_positions_3_or_higher:
+    #             # 最大のx座標とy座標を更新
+    #             if level >= 3:
+    #                 level3_max_x = max(level3_max_x, x)
+    #                 level3_max_y = max(level3_max_y, y)
+
+    #             if level == 3 and x != level3_start_x:
+    #                 # レベル3の区間の四角形を計算
+    #                 width = level3_max_x - level3_start_x - 120
+    #                 height = level3_max_y - 480 + 120  # y座標の基準点は480
+    #                 frame_x = level3_start_x + ( width - 120 ) / 2
+    #                 frame_y = 480 + ( height - 120 ) / 2  # y座標の基準点を加算
+
+    #                 # 子要素がある場合のみ四角形を追加（四角形の高さが120の場合は追加しない）
+    #                 if height != 120:
+    #                     # 四角形を追加
+    #                     add_rounded_rectangle(api_token, boardId, frame_x, frame_y, width, height)
+
+    #                 # 新しいレベル3の開始点を設定
+    #                 level3_start_x = x
+    #                 level3_max_x = x
+    #                 level3_max_y = 480  # y座標の基準点をリセット
+
+    #         # 最後の範囲の四角形を計算して追加（レベル3が最後に現れた場合）
+    #         if level3_max_x > level3_start_x:
+    #             width = level3_max_x - level3_start_x + 120
+    #             height = level3_max_y - 480 + 120  # y座標の基準点は480
+    #             frame_x = level3_start_x + ( width - 120 ) / 2
+    #             frame_y = 480 + ( height - 120 ) / 2  # y座標の基準点を加算
+    #             add_rounded_rectangle(api_token, boardId, frame_x, frame_y, width, height)
+
+
+    #         # レベル4ごとの四角形を作成
+    #         # 4以上の要素のみ抽出
+    #         level_4_or_higher = [item for item in parsed_markdown if item[0] >= 4]
+
+    #         # levelの値が4以上の要素を抽出
+    #         elements_level_4_or_higher = [item for item in element_positions if item['level'] >= 4]
+
+    #         # リストをタプルの形に変換
+    #         tuple_list_positions_4_or_higher = [(item['level'], item['x'], item['y']) for item in elements_level_4_or_higher]
+
+    #         if highest_level == 5:
+    #             # 5が出現する最後の項目までのリストを生成
+    #             last_five_index = None
+    #             for i, (level, _, _) in enumerate(tuple_list_positions_4_or_higher):
+    #                 if level == 5:
+    #                     last_four_index = i
+
+    #             # last_five_indexがNoneでなければ、最後の5までのリストをスライスする
+    #             if last_five_index is not None:
+    #                 result_list = tuple_list_positions_4_or_higher[:last_five_index + 1]
+    #             else:
+    #                 result_list = tuple_list_positions_4_or_higher  # 5がない場合は元のリストをそのまま使用
+
+    #             tuple_list_positions_4_or_higher = result_list
+
+    #         # レベル4ごとの四角形を計算するための変数
+    #         level4_start_x = 0
+    #         level4_max_x = 0
+    #         level4_max_y = 0
+
+    #         # 各レベル4ごとに四角形を計算して追加
+    #         for level, x, y in tuple_list_positions_4_or_higher:
+    #             # 最大のx座標とy座標を更新
+    #             if level >= 4:
+    #                 level4_max_x = max(level4_max_x, x)
+    #                 level4_max_y = max(level4_max_y, y)
+
+    #             if level == 4 and x != level4_start_x:
+    #                 # レベル4の区間の四角形を計算
+    #                 width = level4_max_x - level4_start_x - 120
+    #                 height = level4_max_y - 600 + 120  # y座標の基準点は600
+    #                 frame_x = level4_start_x + ( width - 120 ) / 2
+    #                 frame_y = 600 + ( height - 120 ) / 2  # y座標の基準点を加算
+
+    #                 # 子要素がある場合のみ四角形を追加（四角形の高さが120の場合は追加しない）
+    #                 if height != 120:
+    #                     # 四角形を追加
+    #                     add_rounded_rectangle(api_token, boardId, frame_x, frame_y, width, height)
+
+    #                 # 新しいレベル4の開始点を設定
+    #                 level4_start_x = x
+    #                 level4_max_x = x
+    #                 level4_max_y = 600  # y座標の基準点をリセット
+
+    #         # 最後の範囲の四角形を計算して追加（レベル4が最後に現れた場合）
+    #         if level4_max_x > level4_start_x:
+    #             width = level4_max_x - level4_start_x + 120
+    #             height = level4_max_y - 600 + 120  # y座標の基準点は600
+    #             frame_x = level4_start_x + ( width - 120 ) / 2
+    #             frame_y = 600 + ( height - 120 ) / 2  # y座標の基準点を加算
+    #             add_rounded_rectangle(api_token, boardId, frame_x, frame_y, width, height)
+
+
+    #         # レベル5ごとの四角形を作成
+    #         # 5以上の要素のみ抽出
+    #         level_5_or_higher = [item for item in parsed_markdown if item[0] >= 5]
+
+    #         # levelの値が5以上の要素を抽出
+    #         elements_level_5_or_higher = [item for item in element_positions if item['level'] >= 5]
+
+    #         # リストをタプルの形に変換
+    #         tuple_list_positions_5_or_higher = [(item['level'], item['x'], item['y']) for item in elements_level_5_or_higher]
+    #         print(">>>> tuple_list_positions_5_or_higherは、", tuple_list_positions_5_or_higher)
+
+    #         if highest_level == 6:
+    #             # 6が出現する最後の項目までのリストを生成
+    #             last_six_index = None
+    #             for i, (level, _, _) in enumerate(tuple_list_positions_5_or_higher):
+    #                 if level == 6:
+    #                     last_six_index = i
+
+    #             # last_six_indexがNoneでなければ、最後の6までのリストをスライスする
+    #             if last_six_index is not None:
+    #                 result_list = tuple_list_positions_5_or_higher[:last_six_index + 1]
+    #             else:
+    #                 result_list = tuple_list_positions_5_or_higher  # 6がない場合は元のリストをそのまま使用
+
+    #             tuple_list_positions_5_or_higher = result_list
+
+    #         # レベル5ごとの四角形を計算するための変数
+    #         level5_start_x = 0
+    #         level5_max_x = 0
+    #         level5_max_y = 0
+
+    #         # 各レベル5ごとに四角形を計算して追加
+    #         for level, x, y in tuple_list_positions_5_or_higher:
+    #             # 最大のx座標とy座標を更新
+    #             if level >= 5:
+    #                 level5_max_x = max(level5_max_x, x)
+    #                 level5_max_y = max(level5_max_y, y)
+    #                 print(">>>> 現在のlevelは、", level, " 更新されたx座標の最大値は、", level5_max_x, " 更新されたy座標の最大値は、", level5_max_y)
+
+    #             if level == 5 and x != level5_start_x:
+    #                 # レベル5の区間の四角形を計算
+    #                 width = level5_max_x - level5_start_x - 120
+    #                 height = level5_max_y - 720 + 120  # y座標の基準点は720
+    #                 frame_x = level5_start_x + ( width - 120 ) / 2
+    #                 frame_y = 720 + ( height - 120 ) / 2  # y座標の基準点を加算
+
+    #                 # 子要素がある場合のみ四角形を追加（四角形の高さが120の場合は追加しない）
+    #                 if height != 120:
+    #                     # 四角形を追加
+    #                     add_rounded_rectangle(api_token, boardId, frame_x, frame_y, width, height)
+
+    #                 # 新しいレベル5の開始点を設定
+    #                 level5_start_x = x
+    #                 print(">>>> 新しいlevel5の開始点は、", level5_start_x)
+    #                 level5_max_x = x
+    #                 print(">>>> 現在のlevel5のx軸の最大値は、", level5_max_x)
+    #                 level5_max_y = 720  # y座標の基準点をリセット
+
+    #         # 最後の範囲の四角形を計算して追加（レベル5が最後に現れた場合）
+    #         if level5_max_x > level5_start_x:
+    #             width = level5_max_x - level5_start_x + 120
+    #             height = level5_max_y - 720 + 120  # y座標の基準点は720
+    #             frame_x = level5_start_x + ( width - 120 ) / 2
+    #             frame_y = 720 + ( height - 120 ) / 2  # y座標の基準点を加算
+    #             add_rounded_rectangle(api_token, boardId, frame_x, frame_y, width, height)
+
+
     sentence_container = st.container()
     with sentence_container:
         with st.form(key="my_sentence", clear_on_submit=False):
@@ -1359,6 +1910,9 @@ def main():
 
             # テキストエリア"階層化データ"のデータでsession_stateの"markdown_text"を更新
             st.session_state["markdown_text"] = layered_data
+
+            # session_stateの"markdown_text"をリセット
+            st.session_state.messages = []
 
             # 変数answerをリセット
             answer = ""
@@ -1481,6 +2035,8 @@ Please add a logical connection and a conjunction to the the text below.
                 basic_data_for_abduction = segmented_by_three(labels_only_reversed)
                 print("basic_data_for_abductionは、", basic_data_for_abduction)
 
+                # BDAごとの文章化に使うlast_messagesをリセット
+                last_messages = []
                 # BDAごとに文章化
                 for group in basic_data_for_abduction:
                     print("basic_data_for_abductionのグループ：", group)
@@ -1490,26 +2046,13 @@ Please add a logical connection and a conjunction to the the text below.
                         just_before_answer_summarized = sentence_generating(llm,group,st.session_state["translated_theme"],summarized_list,st.session_state["openai_api_key"],style)
                         summarized_list.append(just_before_answer_summarized)
 
-                # print("1240行目のsummarized_list：", summarized_list)
-                # summarized_list = [s for s in summarized_list if s != ""]
-
-                # # 一つの島のBDAが4つ以上になった場合、BDAの要約を3つずつに分けてそれぞれ要約し、summarized_each_listに格納する
-                # if len(summarized_list) > 3:
-                #     just_before_answer_summarized = ""
-                #     for idx in range(0, len(summarized_list), 3):
-                #         summarized_list_split = summarized_list[idx:idx + 3]
-                #         print("1246行目のsummarized_list_split：", summarized_list_split)
-                #         summarized_text_each = "\n".join(summarized_list_split)
-                #         just_before_answer_summarized = sumarized_sentence_generating(llm,summarized_text_each,st.session_state["translated_theme"],just_before_answer_summarized)
-                #         summarized_each_list.append(just_before_answer_summarized)
-                # else:
-                #     summarized_each_list.append(just_before_answer_summarized)
-                # summarized_list = []
-
-                # # 島のシンボルマークをsummarized_listに入れて、次の島の書き始めにつなげる。
-                # print(matches_symbol)
-                # summarized_list.insert(0,st.session_state.messages[-1].content)
-                # print("島と島との繋ぎのsummarized_list：",summarized_list)
+            last_answer = st.session_state.messages[-1].content
+            print("last_answerは", last_answer)
+            if last_answer:
+                last_answer_summarized = summarize(last_answer,openai_api_key,style)
+            else:
+                last_answer_summarized = ""
+            summarized_list.append(last_answer_summarized)
             
             summarized_text = "\n".join(summarized_list)
             just_before_answer_summarized = ""
@@ -1520,295 +2063,265 @@ Please add a logical connection and a conjunction to the the text below.
             st.session_state["summarized_data"] = summarized_all
             st.markdown(summarized_all)
 
-    related_container = st.container()
-    with related_container:
-        with st.form(key="my_related", clear_on_submit=False):
-            summarized_data = st.text_area(label="まとめの文章: ", key="summarized_data", value=st.session_state["summarized_data"], height=300)
-            ask_detective_button = st.form_submit_button(label="次の取材対象を探偵に聞く🕵️‍♂️")
-            ask_gal_button = st.form_submit_button(label="ネクストターゲットを大学生に教えてもらう🙏🏻✨💌")
+    # related_container = st.container()
+    # with related_container:
+    #     with st.form(key="my_related", clear_on_submit=False):
+    #         summarized_data = st.text_area(label="まとめの文章: ", key="summarized_data", value=st.session_state["summarized_data"], height=300)
+    #         ask_button = st.form_submit_button(label="ウィキペディアからヒントを探す")
 
-        if ask_detective_button and summarized_data:
+    #     if ask_button and summarized_data:
 
-            # まとめ文章の総文字数の3分の1ごとに分割してリスト化
-            split_text_length = int(len(summarized_data) / 3)
-            split_sentences = [summarized_data[x:x+split_text_length] for x in range(0,len(summarized_data),split_text_length)]
-            # 分割結果が20文字以下の文章の場合、削除する
-            for i, item in enumerate(split_sentences):
-                if len(item) < 20:
-                    del split_sentences[i]
+    #         # まとめ文章の総文字数の3分の1ごとに分割してリスト化
+    #         split_text_length = int(len(summarized_data) / 3)
+    #         split_sentences = [summarized_data[x:x+split_text_length] for x in range(0,len(summarized_data),split_text_length)]
+    #         # 分割結果が20文字以下の文章の場合、削除する
+    #         for i, item in enumerate(split_sentences):
+    #             if len(item) < 20:
+    #                 del split_sentences[i]
 
-            with st.spinner("探偵事務所に問い合わせ中 ..."):
-                # wikipediaデータ、faiss index、embedding化のためのデータをロード
-                wikija_dataset, faiss_index, model = load_wiki()
+    #         with st.spinner("検索中 ..."):
+    #             # wikipediaデータ、faiss index、embedding化のためのデータをロード
+    #             wikija_dataset, faiss_index, model = load_wiki()
 
-            st.subheader(f"依頼テーマ：")
-            st.markdown(f"""#### 『{st.session_state["user_theme"]}』""")
-            st.markdown("上のまとめをもとに、次に調査すべき対象を探偵（🕵️‍♂️）から聞きました。")
-            st.caption("""
-インターネットや図書館で調べたり、実際に現地を訪れたりするための入り口にしてみてください。
-そこで出会ったり見聞きしたことから、更に次の調査対象に渡り歩き、最終的にあなたの問題意識を更に深めることができます。\n
-そして、調べるなかで、感動したり、なるほどと思ったり、またはこれは違うなと感じたりしたら、忘れないうちに箇条書きでメモしてみてください。\
-それが30個ほど貯まったら、またこのKJ-GPTを使って分析してみると、アイデアをますますブラッシュアップすることができます。
- """)
-            wiki_item_list = []
-            for i, item in enumerate(split_sentences):
-                # container = st.container()
-                # container.write(item)
-                emb = to_emb(model, item)
-                # faiss で検索して、関連 Top-15 を取り出す
-                TOP_K = 15
-                scores, indexes = faiss_index.search(emb, TOP_K)
-                # インデックス順4~15位から1つをランダムで指定
-                selected_indexes = random.sample(range(4,15), k=1)
-                # 残り一つは、8~20位のうちからランダムで指定
-                # selected_indexes.insert(1,random.randint(8,20))
+    #         st.subheader(f"テーマ：")
+    #         st.markdown(f"""#### 『{st.session_state["user_theme"]}』""")
+    #         st.markdown("まとめの文章をもとに、ウィキペディアから関係のありそうなヒントを探します。")
 
-                for sel_i, idx in enumerate(selected_indexes):
-                    if idx < TOP_K:  # 範囲を超えないようにチェック
-                        # if i  == 1 and sel_i == 1:
-                        #     id = random.randint(1,5555583)
-                        # if idx % 3  == 0:
-                        #     id = random.randint(1,5555583)
-                        # else:
-                        #     id = indexes[0][idx]
-                        id = indexes[0][idx]
-                        score = scores[0][idx]
-                        data = wikija_dataset[int(id)]
-                        print((score, data["title"], data["text"][:100]))
-                        wiki_title = data["title"]
+    #         wiki_item_list = []
+    #         for i, item in enumerate(split_sentences):
+    #             emb = to_emb(model, item)
+    #             # faiss で検索して、関連 Top-15 を取り出す
+    #             TOP_K = 20
+    #             scores, indexes = faiss_index.search(emb, TOP_K)
+    #             # インデックス順1~20位から1つをランダムで指定
+    #             selected_indexes = random.sample(range(1,20), k=1)
+    #             # 残り一つは、8~20位のうちからランダムで指定
+    #             # selected_indexes.insert(1,random.randint(8,20))
 
-                        # wikiの項目が重複していない場合のみ処理
-                        if wiki_title not in wiki_item_list:
-                            wiki_item_list.append(wiki_title)
+    #             for sel_i, idx in enumerate(selected_indexes):
+    #                 if idx < TOP_K:  # 範囲を超えないようにチェック
+    #                     id = indexes[0][idx]
+    #                     score = scores[0][idx]
+    #                     data = wikija_dataset[int(id)]
+    #                     print((score, data["title"], data["text"][:100]))
+    #                     wiki_title = data["title"]
 
-                            wiki_text = ">..." + data["text"] + "..."
+    #                     # wikiの項目が重複していない場合のみ処理
+    #                     if wiki_title not in wiki_item_list:
+    #                         wiki_item_list.append(wiki_title)
 
-                            # 抽出したテキストの最初の1文を取り出す
-                            first_sentence_wiki = data["text"].partition("。")[0]
+    #                         wiki_text = ">..." + data["text"] + "..."
 
-                            url = "https://ja.wikipedia.org/api/rest_v1/page/summary/" + data["title"]
+    #                         # 抽出したテキストの最初の1文を取り出す
+    #                         first_sentence_wiki = data["text"].partition("。")[0]
 
-                            response = requests.get(url)
-                            json_data = response.json()
+    #                         url = "https://ja.wikipedia.org/api/rest_v1/page/summary/" + data["title"]
 
-                            if "extract" in json_data:
-                                wiki_extract = json_data["extract"]
-                            else:
-                                wiki_extract = ""
-                            detective_answer = related_sentence_generating(llm,item,data["text"],st.session_state["translated_theme"],wiki_extract)
-                            st.markdown(f"### ・{wiki_title}")
-                            if "thumbnail" in json_data:
-                                thumbnail_image = json_data["thumbnail"]['source']
-                                st.image(thumbnail_image)
-                            if wiki_extract:
-                                st.caption(wiki_extract)
-                            st.markdown(detective_answer)
-                            st.markdown(wiki_text)
-                            st.link_button("Wikipedia", "https://ja.wikipedia.org/wiki/" + data["title"] + "#:~:text=" + first_sentence_wiki)
+    #                         response = requests.get(url)
+    #                         json_data = response.json()
+
+    #                         if "extract" in json_data:
+    #                             wiki_extract = json_data["extract"]
+    #                         else:
+    #                             wiki_extract = ""
+    #                         # ヒントとなる詩のためのllmセッティング
+    #                         llm_poet = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model_name="gpt-4-1106-preview")
+    #                         poet_answer = related_sentence_generating(llm_poet,item,data["text"],st.session_state["translated_theme"],wiki_extract)
+    #                         st.markdown(f"### ・{wiki_title}")
+    #                         if "thumbnail" in json_data:
+    #                             thumbnail_image = json_data["thumbnail"]['source']
+    #                             st.image(thumbnail_image)
+    #                         if wiki_extract:
+    #                             st.caption(wiki_extract)
+    #                         st.markdown(poet_answer)
+    #                         st.markdown(wiki_text)
+    #                         st.link_button("Wikipedia", "https://ja.wikipedia.org/wiki/" + data["title"] + "#:~:text=" + first_sentence_wiki)
                             
-                            adult_keywords = ['愛撫', 'アクメ', 'アナル', 'イラマチオ', '淫乱', 'オナニー', '仮性包茎', 'ガマン汁', '顔面騎乗', '亀頭', '亀甲縛り', 'クンニリングス', 'ザーメン', 'Gスポット', 'スワッピング', '四十八手', '真性包茎', 'スパンキング', 'スカトロ', '前戯', 'センズリ', '前立腺', '早漏', '祖チン', 'ダッチワイフ', 'ディルド', 'デブ専', '電マ', 'ドライオーガズム', '寝取られ', '本番行為', 'パイパン', 'バキュームフェラ', 'ぶっかけ', 'ペッティング', 'ペニスバンド', 'ポルチオ', 'みこすり半', '夢精', '悶える', 'ヤリチン', 'ヤリマン', '夜這い', 'ラブジュース', 'ちんちん', 'ちんこ', 'チンチン', 'チンコ', 'まんこ', 'おまんこ', 'おっぱい', '巨乳']
+    #                         st.markdown("\n\n")
 
-                            st.markdown("\n\n")
+    #                         bing_query_url = "https://www.bing.com/search?q=" + wiki_title
+    #                         st.link_button(f"Webで「{wiki_title}」を検索", bing_query_url)
 
-                            if any(adult_keyword in wiki_title for adult_keyword in adult_keywords):
-                                print("キーワードに不適切な内容が含まれています。")
-                            else:
-                                bing_query_url = "https://www.bing.com/search?q=" + wiki_title
-                                st.link_button(f"Webで「{wiki_title}」を検索", bing_query_url)
+    #                         st.markdown("\n\n")
 
-                                st.markdown("\n\n")
+    #                         st.markdown("##### 📚")
 
-                                st.markdown("##### 📚")
+    #                         url = "https://www.googleapis.com/books/v1/volumes?q=" + wiki_title + "&langRestrict=ja&orderBy=newest"
 
-                                url = "https://www.googleapis.com/books/v1/volumes?q=" + wiki_title + "&langRestrict=ja&orderBy=newest"
+    #                         response = requests.get(url)
+    #                         json_data = response.json()
 
-                                response = requests.get(url)
-                                json_data = response.json()
+    #                         col1, col2, col3 = st.columns(3)
+    #                         columns = [col1, col2, col3]
 
-                                col1, col2, col3 = st.columns(3)
-                                columns = [col1, col2, col3]
+    #                         if 'items' in json_data:
+    #                             for i, idx in enumerate(json_data['items'][0:2]):
+    #                                 book_item = json_data['items'][i]
+    #                                 volume_info = book_item['volumeInfo']
+    #                                 book_id = book_item['id']
+    #                                 book_title = volume_info['title']
+    #                                 col = columns[i]  # 各アイテムを異なるカラムに均等に割り当てる
+    #                                 with col:
+    #                                     st.markdown(f"""<span style="word-wrap:break-word;">{book_title}</span>""", unsafe_allow_html=True)
+    #                                     if 'imageLinks' in volume_info:
+    #                                         book_thumbnail = volume_info['imageLinks']['thumbnail']
+    #                                         st.image(book_thumbnail)
+    #                                     else:
+    #                                         book_thumbnail = ""
+    #                                     if 'description' in volume_info:
+    #                                         book_description = volume_info['description']
+    #                                         st.caption(book_description[:100])
+    #                                     else:
+    #                                         book_description = ""
+    #                                     book_link = "https://www.google.co.jp/books/edition/_/" + book_id + "?hl=ja"
+    #                                     # book_link = volume_info['previewLink']
+    #                                     st.link_button("詳細", book_link)
 
-                                if 'items' in json_data:
-                                    for i, idx in enumerate(json_data['items'][0:2]):
-                                        book_item = json_data['items'][i]
-                                        volume_info = book_item['volumeInfo']
-                                        book_id = book_item['id']
-                                        book_title = volume_info['title']
-                                        col = columns[i]  # 各アイテムを異なるカラムに均等に割り当てる
-                                        with col:
-                                            st.markdown(f"""<span style="word-wrap:break-word;">{book_title}</span>""", unsafe_allow_html=True)
-                                            if 'imageLinks' in volume_info:
-                                                book_thumbnail = volume_info['imageLinks']['thumbnail']
-                                                st.image(book_thumbnail)
-                                            else:
-                                                book_thumbnail = ""
-                                            if 'description' in volume_info:
-                                                book_description = volume_info['description']
-                                                st.caption(book_description[:100])
-                                            else:
-                                                book_description = ""
-                                            book_link = "https://www.google.co.jp/books/edition/_/" + book_id + "?hl=ja"
-                                            # book_link = volume_info['previewLink']
-                                            st.link_button("詳細", book_link)
+    #                             st.markdown("\n")
+    #                         else:
+    #                             st.markdown("Google Booksでは見つかりませんでした。\n")
 
-                                    st.markdown("\n")
-                                else:
-                                    st.markdown("Google Booksでは見つかりませんでした。\n")
+    #                         amazon_link = f"https://www.amazon.co.jp/s?k={wiki_title}&i=stripbooks"
+    #                         st.link_button("Amazonで関連書籍を探す", amazon_link)
+    #                         calil_link = "https://calil.jp/search?q=" + wiki_title
+    #                         st.link_button("図書館（カーリル）で関連資料を探す", calil_link)
 
-                                amazon_link = f"https://www.amazon.co.jp/s?k={wiki_title}&i=stripbooks"
-                                st.link_button("Amazonで関連書籍を探す", amazon_link)
-                                calil_link = "https://calil.jp/search?q=" + wiki_title
-                                st.link_button("図書館（カーリル）で関連資料を探す", calil_link)
+    #                         st.markdown("\n\n")
 
-                                st.markdown("\n\n")
+#         if ask_gal_button and summarized_data:
 
-        if ask_gal_button and summarized_data:
+#             # まとめ文章の総文字数の3分の1ごとに分割してリスト化
+#             split_text_length = int(len(summarized_data) / 3)
+#             split_sentences = [summarized_data[x:x+split_text_length] for x in range(0,len(summarized_data),split_text_length)]
+#             # 分割結果が20文字以下の文章の場合、削除する
+#             for i, item in enumerate(split_sentences):
+#                 if len(item) < 20:
+#                     del split_sentences[i]
 
-            # まとめ文章の総文字数の3分の1ごとに分割してリスト化
-            split_text_length = int(len(summarized_data) / 3)
-            split_sentences = [summarized_data[x:x+split_text_length] for x in range(0,len(summarized_data),split_text_length)]
-            # 分割結果が20文字以下の文章の場合、削除する
-            for i, item in enumerate(split_sentences):
-                if len(item) < 20:
-                    del split_sentences[i]
+#             with st.spinner("インスタでアカウントを検索中 ..."):
+#                 # wikipediaデータ、faiss index、embedding化のためのデータをロード
+#                 wikija_dataset, faiss_index, model = load_wiki()
 
-            with st.spinner("インスタでアカウントを検索中 ..."):
-                # wikipediaデータ、faiss index、embedding化のためのデータをロード
-                wikija_dataset, faiss_index, model = load_wiki()
+#             st.subheader(f"依頼テーマ：")
+#             st.markdown(f"""#### 『{st.session_state["user_theme"]}』""")
+#             st.markdown("上のまとめをもとに、次に調査すべき対象を大学生から聞きました🤭🤍")
+#             st.caption("""
+# インターネットや図書館で調べたり、実際に現地を訪れたりするための入り口にしてみてください。
+# そこで出会ったり見聞きしたことから、更に次の調査対象に渡り歩き、最終的にあなたの問題意識を更に深めることができます。\n
+# そして、調べるなかで、感動したり、なるほどと思ったり、またはこれは違うなと感じたりしたら、忘れないうちに箇条書きでメモしてみてください。\
+# それが30個ほど貯まったら、またこのKJ-GPTを使って分析してみると、アイデアをますますブラッシュアップすることができます。
+#  """)
+#             wiki_item_list = []
+#             for i, item in enumerate(split_sentences):
+#                 # container = st.container()
+#                 # container.write(item)
+#                 emb = to_emb(model, item)
+#                 # faiss で検索して、関連 Top-15 を取り出す
+#                 TOP_K = 15
+#                 scores, indexes = faiss_index.search(emb, TOP_K)
+#                 # インデックス順4~15位から1つをランダムで指定
+#                 selected_indexes = random.sample(range(4,15), k=1)
+#                 # 残り一つは、8~20位のうちからランダムで指定
+#                 # selected_indexes.insert(1,random.randint(8,20))
 
-            st.subheader(f"依頼テーマ：")
-            st.markdown(f"""#### 『{st.session_state["user_theme"]}』""")
-            st.markdown("上のまとめをもとに、次に調査すべき対象を大学生から聞きました🤭🤍")
-            st.caption("""
-インターネットや図書館で調べたり、実際に現地を訪れたりするための入り口にしてみてください。
-そこで出会ったり見聞きしたことから、更に次の調査対象に渡り歩き、最終的にあなたの問題意識を更に深めることができます。\n
-そして、調べるなかで、感動したり、なるほどと思ったり、またはこれは違うなと感じたりしたら、忘れないうちに箇条書きでメモしてみてください。\
-それが30個ほど貯まったら、またこのKJ-GPTを使って分析してみると、アイデアをますますブラッシュアップすることができます。
- """)
-            wiki_item_list = []
-            for i, item in enumerate(split_sentences):
-                # container = st.container()
-                # container.write(item)
-                emb = to_emb(model, item)
-                # faiss で検索して、関連 Top-15 を取り出す
-                TOP_K = 15
-                scores, indexes = faiss_index.search(emb, TOP_K)
-                # インデックス順4~15位から1つをランダムで指定
-                selected_indexes = random.sample(range(4,15), k=1)
-                # 残り一つは、8~20位のうちからランダムで指定
-                # selected_indexes.insert(1,random.randint(8,20))
+#                 for sel_i, idx in enumerate(selected_indexes):
+#                     if idx < TOP_K:  # 範囲を超えないようにチェック
+#                         # if i  == 1 and sel_i == 1:
+#                         #     id = random.randint(1,5555583)
+#                         # if idx % 3  == 0:
+#                         #     id = random.randint(1,5555583)
+#                         # else:
+#                         #     id = indexes[0][idx]
+#                         id = indexes[0][idx]
+#                         score = scores[0][idx]
+#                         data = wikija_dataset[int(id)]
+#                         print((score, data["title"], data["text"][:100]))
+#                         wiki_title = data["title"]
 
-                for sel_i, idx in enumerate(selected_indexes):
-                    if idx < TOP_K:  # 範囲を超えないようにチェック
-                        # if i  == 1 and sel_i == 1:
-                        #     id = random.randint(1,5555583)
-                        # if idx % 3  == 0:
-                        #     id = random.randint(1,5555583)
-                        # else:
-                        #     id = indexes[0][idx]
-                        id = indexes[0][idx]
-                        score = scores[0][idx]
-                        data = wikija_dataset[int(id)]
-                        print((score, data["title"], data["text"][:100]))
-                        wiki_title = data["title"]
+#                         # wikiの項目が重複していない場合のみ処理
+#                         if wiki_title not in wiki_item_list:
+#                             wiki_item_list.append(wiki_title)
 
-                        # wikiの項目が重複していない場合のみ処理
-                        if wiki_title not in wiki_item_list:
-                            wiki_item_list.append(wiki_title)
+#                             wiki_text = ">..." + data["text"] + "..."
 
-                            wiki_text = ">..." + data["text"] + "..."
+#                             # 抽出したテキストの最初の1文を取り出す
+#                             first_sentence_wiki = data["text"].partition("。")[0]
 
-                            # 抽出したテキストの最初の1文を取り出す
-                            first_sentence_wiki = data["text"].partition("。")[0]
+#                             url = "https://ja.wikipedia.org/api/rest_v1/page/summary/" + data["title"]
 
-                            url = "https://ja.wikipedia.org/api/rest_v1/page/summary/" + data["title"]
+#                             response = requests.get(url)
+#                             json_data = response.json()
 
-                            response = requests.get(url)
-                            json_data = response.json()
-
-                            if "extract" in json_data:
-                                wiki_extract = json_data["extract"]
-                            else:
-                                wiki_extract = ""
-                            gal_answer = related_gal_sentence_generating(llm,item,data["text"],st.session_state["translated_theme"],wiki_extract)
-                            st.markdown(f"### ・{wiki_title}")
-                            if "thumbnail" in json_data:
-                                thumbnail_image = json_data["thumbnail"]['source']
-                                st.image(thumbnail_image)
-                            if wiki_extract:
-                                st.caption(wiki_extract)
-                            st.markdown(gal_answer)
-                            st.markdown(wiki_text)
-                            st.link_button("Wikipedia", "https://ja.wikipedia.org/wiki/" + data["title"] + "#:~:text=" + first_sentence_wiki)
+#                             if "extract" in json_data:
+#                                 wiki_extract = json_data["extract"]
+#                             else:
+#                                 wiki_extract = ""
+#                             gal_answer = related_gal_sentence_generating(llm,item,data["text"],st.session_state["translated_theme"],wiki_extract)
+#                             st.markdown(f"### ・{wiki_title}")
+#                             if "thumbnail" in json_data:
+#                                 thumbnail_image = json_data["thumbnail"]['source']
+#                                 st.image(thumbnail_image)
+#                             if wiki_extract:
+#                                 st.caption(wiki_extract)
+#                             st.markdown(gal_answer)
+#                             st.markdown(wiki_text)
+#                             st.link_button("Wikipedia", "https://ja.wikipedia.org/wiki/" + data["title"] + "#:~:text=" + first_sentence_wiki)
                             
-                            adult_keywords = ['愛撫', 'アクメ', 'アナル', 'イラマチオ', '淫乱', 'オナニー', '仮性包茎', 'ガマン汁', '顔面騎乗', '亀頭', '亀甲縛り', 'クンニリングス', 'ザーメン', 'Gスポット', 'スワッピング', '四十八手', '真性包茎', 'スパンキング', 'スカトロ', '前戯', 'センズリ', '前立腺', '早漏', '祖チン', 'ダッチワイフ', 'ディルド', 'デブ専', '電マ', 'ドライオーガズム', '寝取られ', '本番行為', 'パイパン', 'バキュームフェラ', 'ぶっかけ', 'ペッティング', 'ペニスバンド', 'ポルチオ', 'みこすり半', '夢精', '悶える', 'ヤリチン', 'ヤリマン', '夜這い', 'ラブジュース', 'ちんちん', 'ちんこ', 'チンチン', 'チンコ', 'まんこ', 'おまんこ', 'おっぱい', '巨乳']
+#                             adult_keywords = ['愛撫', 'アクメ', 'アナル', 'イラマチオ', '淫乱', 'オナニー', '仮性包茎', 'ガマン汁', '顔面騎乗', '亀頭', '亀甲縛り', 'クンニリングス', 'ザーメン', 'Gスポット', 'スワッピング', '四十八手', '真性包茎', 'スパンキング', 'スカトロ', '前戯', 'センズリ', '前立腺', '早漏', '祖チン', 'ダッチワイフ', 'ディルド', 'デブ専', '電マ', 'ドライオーガズム', '寝取られ', '本番行為', 'パイパン', 'バキュームフェラ', 'ぶっかけ', 'ペッティング', 'ペニスバンド', 'ポルチオ', 'みこすり半', '夢精', '悶える', 'ヤリチン', 'ヤリマン', '夜這い', 'ラブジュース', 'ちんちん', 'ちんこ', 'チンチン', 'チンコ', 'まんこ', 'おまんこ', 'おっぱい', '巨乳']
 
-                            st.markdown("\n\n")
+#                             st.markdown("\n\n")
 
-                            if any(adult_keyword in wiki_title for adult_keyword in adult_keywords):
-                                print("キーワードに不適切な内容が含まれています。")
-                            else:
-                                bing_query_url = "https://www.bing.com/search?q=" + wiki_title
-                                st.link_button(f"Webで「{wiki_title}」を検索", bing_query_url)
+#                             if any(adult_keyword in wiki_title for adult_keyword in adult_keywords):
+#                                 print("キーワードに不適切な内容が含まれています。")
+#                             else:
+#                                 bing_query_url = "https://www.bing.com/search?q=" + wiki_title
+#                                 st.link_button(f"Webで「{wiki_title}」を検索", bing_query_url)
 
-                                st.markdown("\n\n")
+#                                 st.markdown("\n\n")
 
-                                st.markdown("##### 📚")
+#                                 st.markdown("##### 📚")
 
-                                url = "https://www.googleapis.com/books/v1/volumes?q=" + wiki_title + "&langRestrict=ja&orderBy=newest"
+#                                 url = "https://www.googleapis.com/books/v1/volumes?q=" + wiki_title + "&langRestrict=ja&orderBy=newest"
 
-                                response = requests.get(url)
-                                json_data = response.json()
+#                                 response = requests.get(url)
+#                                 json_data = response.json()
 
-                                col1, col2, col3 = st.columns(3)
-                                columns = [col1, col2, col3]
+#                                 col1, col2, col3 = st.columns(3)
+#                                 columns = [col1, col2, col3]
 
-                                if 'items' in json_data:
-                                    for i, idx in enumerate(json_data['items'][0:2]):
-                                        book_item = json_data['items'][i]
-                                        volume_info = book_item['volumeInfo']
-                                        book_id = book_item['id']
-                                        book_title = volume_info['title']
-                                        col = columns[i]  # 各アイテムを異なるカラムに均等に割り当てる
-                                        with col:
-                                            st.markdown(f"""<span style="word-wrap:break-word;">{book_title}</span>""", unsafe_allow_html=True)
-                                            if 'imageLinks' in volume_info:
-                                                book_thumbnail = volume_info['imageLinks']['thumbnail']
-                                                st.image(book_thumbnail)
-                                            else:
-                                                book_thumbnail = ""
-                                            if 'description' in volume_info:
-                                                book_description = volume_info['description']
-                                                st.caption(book_description[:100])
-                                            else:
-                                                book_description = ""
-                                            book_link = "https://www.google.co.jp/books/edition/_/" + book_id + "?hl=ja"
-                                            # book_link = volume_info['previewLink']
-                                            st.link_button("詳細", book_link)
+#                                 if 'items' in json_data:
+#                                     for i, idx in enumerate(json_data['items'][0:2]):
+#                                         book_item = json_data['items'][i]
+#                                         volume_info = book_item['volumeInfo']
+#                                         book_id = book_item['id']
+#                                         book_title = volume_info['title']
+#                                         col = columns[i]  # 各アイテムを異なるカラムに均等に割り当てる
+#                                         with col:
+#                                             st.markdown(f"""<span style="word-wrap:break-word;">{book_title}</span>""", unsafe_allow_html=True)
+#                                             if 'imageLinks' in volume_info:
+#                                                 book_thumbnail = volume_info['imageLinks']['thumbnail']
+#                                                 st.image(book_thumbnail)
+#                                             else:
+#                                                 book_thumbnail = ""
+#                                             if 'description' in volume_info:
+#                                                 book_description = volume_info['description']
+#                                                 st.caption(book_description[:100])
+#                                             else:
+#                                                 book_description = ""
+#                                             book_link = "https://www.google.co.jp/books/edition/_/" + book_id + "?hl=ja"
+#                                             # book_link = volume_info['previewLink']
+#                                             st.link_button("詳細", book_link)
 
-                                    st.markdown("\n")
-                                else:
-                                    st.markdown("Google Booksでは見つかりませんでした。\n")
+#                                     st.markdown("\n")
+#                                 else:
+#                                     st.markdown("Google Booksでは見つかりませんでした。\n")
 
-                                amazon_link = f"https://www.amazon.co.jp/s?k={wiki_title}&i=stripbooks"
-                                st.link_button("Amazonで関連書籍を探す", amazon_link)
-                                calil_link = "https://calil.jp/search?q=" + wiki_title
-                                st.link_button("図書館（カーリル）で関連資料を探す", calil_link)
+#                                 amazon_link = f"https://www.amazon.co.jp/s?k={wiki_title}&i=stripbooks"
+#                                 st.link_button("Amazonで関連書籍を探す", amazon_link)
+#                                 calil_link = "https://calil.jp/search?q=" + wiki_title
+#                                 st.link_button("図書館（カーリル）で関連資料を探す", calil_link)
 
-                                st.markdown("\n\n")
-
-
-    # チャット履歴の表示
-    # messages = st.session_state.get("messages", [])
-    # for message in messages:
-    #     if isinstance(message, AIMessage):
-    #         with st.chat_message("assistant"):
-    #             st.markdown(message.content)
-    #     elif isinstance(message, HumanMessage):
-    #         with st.chat_message("user"):
-    #             st.markdown(message.content)
-        # else:
-        #     st.write(f"System message: {message.content}")
+#                                 st.markdown("\n\n")
 
     # コストの計算と表示
     costs = st.session_state.get('costs', [])
