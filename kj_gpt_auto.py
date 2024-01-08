@@ -836,14 +836,12 @@ def split_by_hashes(text):
 
     # マッチング結果をリストに格納
     matches_hashes = [re.findall(p, text, re.MULTILINE) for p in pattern_hashes]
-    print("matches_hashes", matches_hashes)
 
     # '**' で挟まれたテキストから "(数字)" を除外して抽出する正規表現パターン
     pattern_bold_text_excluding_numbers = r"\*\*\(\d+\) (.+?)\*\*"
 
     # マッチング結果をリストに格納
     matches_bold_text_excluding_numbers = re.findall(pattern_bold_text_excluding_numbers, text)
-    print("matches_bold_text_excluding_numbers", matches_bold_text_excluding_numbers)
 
     # セクションを辞書として関連付ける
     related_sections = {}
@@ -1026,15 +1024,11 @@ def sentence_generating(llm,group,translated_theme,summarized_list,openai_api_ke
         last_answer = st.session_state.messages[-1].content
     else:
         last_answer = ""
-    print("last_answerは", last_answer)
     
     if last_answer:
         last_answer_summarized = summarize(last_answer,openai_api_key,style)
     else:
         last_answer_summarized = ""
-    print("last_answerの要約は", last_answer_summarized)
-
-    print("内容は　", group)
 
     if style == "formal":
         sentence = f"""
@@ -1090,8 +1084,6 @@ Any additional explanations should be enclosed in parentheses.
 （{last_answer_summarized}）
 """
 
-    print("prompt:", sentence)
-
     st.session_state.messages.append(SystemMessage(content=sentence))
     st.session_state.messages.append(HumanMessage(content=group))
     last_12_messages = st.session_state.messages[-12:]
@@ -1100,7 +1092,6 @@ Any additional explanations should be enclosed in parentheses.
         if isinstance(message, AIMessage):
             ai_messages.append(message)
     last_messages = ai_messages + st.session_state.messages[-2:]
-    print("last_messages >>>> ", last_messages)
     with st.spinner("KJ-GPTが文章化しています ..."):
         answer, cost = get_answer(llm, last_messages)
     combined_list.append(answer)
@@ -1205,8 +1196,6 @@ iPadでイラストを描くことの自由さを愛し、心を動かす漫画�
 
 ### Input:
 """
-
-    print("prompt:", sentence)
 
     st.session_state.messages.append(SystemMessage(content=sentence))
     st.session_state.messages.append(HumanMessage(content=group))
@@ -1363,7 +1352,6 @@ def main():
 
             group_list = get_init_list(user_input)
             number_of_items = len(group_list)
-            print(number_of_items)
             labeling_pair = []
             dict = {}
             count = 1
@@ -2003,7 +1991,6 @@ Please add a logical connection and a conjunction to the the text below.
             st.markdown(converted_markdown)
             # マークダウンテキストを段落ごとに分割。
             segmented_sections = split_sections(markdown_text)
-            print("segmented_sectionsは、", segmented_sections)
             basic_data_for_abduction = {}
             summarized_list = []
             summarized_each_list = []
@@ -2033,13 +2020,11 @@ Please add a logical connection and a conjunction to the the text below.
 
                 # BDA（Basic Data for Abduction）として3行ずつに分割
                 basic_data_for_abduction = segmented_by_three(labels_only_reversed)
-                print("basic_data_for_abductionは、", basic_data_for_abduction)
 
                 # BDAごとの文章化に使うlast_messagesをリセット
                 last_messages = []
                 # BDAごとに文章化
                 for group in basic_data_for_abduction:
-                    print("basic_data_for_abductionのグループ：", group)
                     # groupが1つ（シンボルマークのみ）の場合を除いて文章化を実行
                     if "\n" in group:
                         # sentence_generatingで文章化し、返し値の要約文をjust_before_answer_summarizedに格納
@@ -2047,7 +2032,6 @@ Please add a logical connection and a conjunction to the the text below.
                         summarized_list.append(just_before_answer_summarized)
 
             last_answer = st.session_state.messages[-1].content
-            print("last_answerは", last_answer)
             if last_answer:
                 last_answer_summarized = summarize(last_answer,openai_api_key,style)
             else:
@@ -2056,7 +2040,6 @@ Please add a logical connection and a conjunction to the the text below.
             
             summarized_text = "\n".join(summarized_list)
             just_before_answer_summarized = ""
-            print("まとめの文章：", summarized_text)
             st.markdown("**まとめ**")
             summarized_all = sumarized_sentence_generating(llm,summarized_text,st.session_state["translated_theme"],style)
             # summarized_all = summarized_all.replace("\n","")
