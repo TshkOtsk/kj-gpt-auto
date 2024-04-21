@@ -883,7 +883,7 @@ def parse_dict_from_string(string):
             # 辞書形式でない場合はそのまま返す
             return string
     except ValueError as e:
-        print(f"Error converting string to dictionary: {e}")
+        # print(f"Error converting string to dictionary: {e}")
         return string  # 変換に失敗した場合も元の文字列を返す
 
 def add_markdown_entry(level, text):
@@ -1180,8 +1180,8 @@ def add_rounded_rectangle(api_key, board_id, x, y, width, height, level):
 
     response = requests.post(url, json=payload, headers=headers)
 
-    print(response.text)
-    print(f"角丸四角形のシェイプが位置({x}, {y})に幅{width}、高さ{height}で作成されました")
+    # print(response.text)
+    # print(f"角丸四角形のシェイプが位置({x}, {y})に幅{width}、高さ{height}で作成されました")
 
 
 def add_shape_to_miro(api_key, board_id, text, x, y):
@@ -1205,7 +1205,7 @@ def add_shape_to_miro(api_key, board_id, text, x, y):
 
     response = requests.post(url, json=payload, headers=headers)
 
-    print(response.text)
+    # print(response.text)
 
 def text_to_lines_list(input_text):
   """#で始まるマークダウンの箇条書きを、行ごとに分割してリスト化する関数"""
@@ -1563,7 +1563,7 @@ Please include plenty of line breaks in your poem to make it easier to read.
 {wiki_text}
 """
 
-    print("prompt:", sentence)
+    # print("prompt:", sentence)
 
     st.session_state.messages.append(SystemMessage(content=sentence))
     with st.spinner("検索中 ..."):
@@ -1602,7 +1602,7 @@ Please include three or four of the following emojis in the text in any combinat
 {wiki_extract}
 {wiki_text}
 """
-    print("prompt:", sentence)
+    # print("prompt:", sentence)
 
     st.session_state.messages.append(SystemMessage(content=sentence))
     # st.session_state.messages.append(HumanMessage(content=group))
@@ -1683,7 +1683,6 @@ def main():
         st.session_state["openai_api_key"] = openai_api_key
 
     st.session_state["miro_api_key"] = MIRO_API_KEY
-    print(st.session_state["miro_api_key"])
     
     if openai_api_key:
         llm = select_model(st.session_state["openai_api_key"])
@@ -1720,15 +1719,10 @@ def main():
         else:
             # 現在の最上位の島のデータと、それまでの階層構造のデータを分けてリスト化
             continueing_split = continueing.split("\n\n--------------------------------\n\n")
-            print("continueing_split >>>", continueing_split)
             # 階層構造が入ったリストの2番目の要素をリスト化
             continueing_list = continueing_split[1].split("\n")
-            print("continueing_list >>>", continueing_list)
             # 文字列のリストを実際の辞書のリストに変換
             result_list = [parse_dict_from_string(item) for item in continueing_list]
-
-            # 結果を表示
-            print("result_list >>>", result_list)
 
             # 階層構造の辞書リストで、edited_labeling_pairの値を更新
             st.session_state["edited_labeling_pair"] = result_list
@@ -2108,10 +2102,10 @@ def main():
                     previous_width = shape_width
 
 
-                print("element_positions >>>>", element_positions)
+                # print("element_positions >>>>", element_positions)
                 # 結果の表示
-                for element in element_positions:
-                    print(f"レベル {element['level']} の要素が位置 ({element['x']}, {element['y']}) に追加されました。")
+                # for element in element_positions:
+                #     print(f"レベル {element['level']} の要素が位置 ({element['x']}, {element['y']}) に追加されました。")
 
                 # レベル0ごとの四角形を計算するための変数
                 start_x = 0
@@ -2634,7 +2628,6 @@ def main():
                     summarized_list = []
 
                 last_answer = st.session_state.messages[-1].content
-                print("2455行目のlast_answer >>> ", last_answer)
                 if last_answer:
                     last_answer_summarized = summarize(last_answer,openai_api_key,style)
                 else:
