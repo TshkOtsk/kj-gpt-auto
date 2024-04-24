@@ -1879,9 +1879,10 @@ def main():
                 edited_labeling_df = st.data_editor([key], column_config={"value": st.column_config.Column(f"表札{i+1}")}, use_container_width=True)
                 edited_labels_list.append(edited_labeling_df[0])
                 for value in item.values():
-                    edited_labeled_df = st.data_editor(value, column_config={"value": st.column_config.Column("ラベル")}, use_container_width=True, key=f"values{i}")
+                    # edited_labeled_df = st.data_editor(value, column_config={"value": st.column_config.Column("ラベル",width=None)}, use_container_width=True, key=f"values{i}")
+                    st.table(value) #　表示用のテーブル
                 st.write("--")
-                new_item[edited_labeling_df[0]] = list(edited_labeled_df)
+                new_item[edited_labeling_df[0]] = list(value)
                 edited_labeling_pair.append(new_item)
         edited_labeling_pair_added_solos = edited_labeling_pair
 
@@ -1993,7 +1994,7 @@ def main():
 
         st.session_state["markdown_text"] = markdown_text
 
-        converted_markdown = headline_to_list(markdown_text)
+        converted_markdown = headline_to_list(st.session_state["markdown_text"])
         st.markdown(converted_markdown)
 
         set_state(6)
@@ -2464,6 +2465,15 @@ def main():
                 #     frame_y = 720 + ( height - 120 ) / 2  # y座標の基準点を加算
                 #     add_rounded_rectangle(api_token, boardId, frame_x, frame_y, width, height)
 
+                markdown_text = st.session_state["markdown_text"]
+                # マークダウンテキストをネストした箇条書き形式に変換。
+                converted_markdown = headline_to_list(markdown_text)
+
+                st.subheader("分類結果：")
+
+                # リスト形式のマークダウンテキストを出力。
+                st.markdown(converted_markdown)
+
 
         sentence_container = st.container()
         with sentence_container:
@@ -2605,12 +2615,14 @@ def main():
                     # リスト化したBDAを逆順に並び替え
                     BDA_list_reversed = list(reversed(BDA_list))
 
+                    print(BDA_list_reversed)
+
                     # BDAごとの文章化に使うlast_messagesをリセット
                     last_messages = []
                     # BDAごとに文章化
                     for group in BDA_list_reversed:
-                        # groupが1つ（シンボルマークのみ）の場合を除いて文章化を実行
-                        if "\n" in group:
+                        # groupが0個（シンボルマークのみ）の場合を除いて文章化を実行
+                        if len(group) >= 1:
                             # sentence_generatingで文章化し、返し値の要約文をjust_before_answer_summarizedに格納
                             just_before_answer_summarized = sentence_generating(llm,group,st.session_state["translated_theme"],summarized_list,st.session_state["openai_api_key"],style)
                             summarized_list.append(just_before_answer_summarized)
