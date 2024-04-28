@@ -756,6 +756,9 @@ Rephrase it with an adjective, verb or metaphor with creativity.
 def to_emb(model, text, prefix="query: "):
     return model.encode([prefix + text], normalize_embeddings=True)
 
+def set_state(i):
+    st.session_state.stage = i
+
 def init_page():
     st.set_page_config(
         page_title="KJ-GPT",
@@ -765,7 +768,7 @@ def init_page():
     st.sidebar.title("オプション")
 
 def init_messages():
-    clear_button = st.sidebar.button("履歴をリセット", key="clear")
+    clear_button = st.sidebar.button("履歴をリセット", key="clear", on_click=set_state, args=[0])
     if clear_button or "messages" not in st.session_state:
 
         st.session_state.messages = [
@@ -1644,9 +1647,6 @@ def messages_init():
 if 'stage' not in st.session_state:
     st.session_state.stage = 0
 
-def set_state(i):
-    st.session_state.stage = i
-
 def button_disable():
     # next_roundボタンが押されたらボタンを無効にする
     st.session_state["disable_button"] = True
@@ -1708,7 +1708,7 @@ def main():
         tab1, tab2 = st.tabs(["初めから", "続きから"])
 
         with tab1:
-            user_input = st.text_area(label="項目ラベル: ", key="input", height=300, value=st.session_state.user_input)
+            user_input = st.text_area(label="項目ラベル: ", key="input", height=300)
 
         with tab2:
             continueing = st.text_area(label="続きから: ", key="continueing", height=300)
@@ -1919,11 +1919,11 @@ def main():
             st.session_state["saved_content"] = st.session_state.user_input + "\n\n--------------------------------\n\n" + edited_labeling_pair_txt
             wip_user_theme = st.session_state["user_theme"]
 
-            st.button(label="このままラベル集めを続ける👉", on_click=set_state, args=[0])
+            st.button(label="このままラベル集めを続ける👉", on_click=set_state, args=[1])
 
-            st.download_button("保存💾＆ラベル集めを続ける👉", st.session_state["saved_content"], f"{dt_now_formatted}_{wip_user_theme}", on_click=set_state, args=[0])
+            st.download_button("保存💾＆ラベル集めを続ける👉", st.session_state["saved_content"], f"{dt_now_formatted}_{wip_user_theme}", on_click=set_state, args=[1])
             
-            st.button("完了してシンボルを作る👌", on_click=set_state, args=[5])
+            st.download_button("完了してシンボルを作る👌", st.session_state["saved_content"], f"{dt_now_formatted}_{wip_user_theme}", on_click=set_state, args=[5])
 
             # next_roundボタンを再度有効にする
             st.session_state['disable_button'] = False
