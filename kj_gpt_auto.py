@@ -1751,7 +1751,8 @@ def main():
             number_of_items = number_of_first_items
 
         # ラベル集めのためのllmセッティング
-        llm_group = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.3, model_name="gpt-4-1106-preview")
+        model_name_grouping = "gpt-4-1106-preview"
+        llm_group = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.3, model_name=model_name_grouping)
 
         # 項目数がbreak_pointより少なくなるまでラベル集めをループする
         # lines = count_newlines(user_input)
@@ -1764,7 +1765,7 @@ def main():
             answer, cost = get_answer(llm_group, st.session_state.messages[-2:])
 
             # answerのtoken数を計算
-            tiktoken_encoding = tiktoken.encoding_for_model(st.session_state["model_name"])
+            tiktoken_encoding = tiktoken.encoding_for_model(model_name_grouping)
             encoded = tiktoken_encoding.encode(answer)
             token_count = len(encoded)
 
