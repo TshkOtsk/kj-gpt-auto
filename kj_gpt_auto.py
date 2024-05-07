@@ -1785,8 +1785,8 @@ def main():
                 # グループ分けされていない残りラベルについて、再びグループ分け
                 st.session_state.messages.append(SystemMessage(content=prompt_ptrn))
                 st.session_state.messages.append(HumanMessage(content=ungrouped_data))
-                # 未グルーピングのデータ、systemプロンプト、グルーピング対象の全テータをapiに渡す
-                conti_answer, cost = get_answer(llm_group, st.session_state.messages[-3:])
+                # 未グルーピングのデータ、systemプロンプトをapiに渡す
+                conti_answer, cost = get_answer(llm_group, st.session_state.messages[-2:])
 
                 # 最初のグループ分けとその続きのグループ分け結果を結合
                 answer += conti_answer
