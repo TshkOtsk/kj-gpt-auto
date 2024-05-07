@@ -24,6 +24,7 @@ from datasets.download import DownloadManager
 from datasets import load_dataset
 from sentence_transformers import SentenceTransformer
 import faiss
+import tiktoken
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 MIRO_API_KEY = os.environ.get("MIRO_API_KEY")
@@ -788,6 +789,8 @@ def init_messages():
         st.session_state["openai_api_key"] = ""
 
         st.session_state["miro_api_key"] = ""
+
+        st.session_state["model_name"] = ""
 
         st.session_state["labeling_pair"] = ""
 
@@ -1759,6 +1762,34 @@ def main():
         st.session_state.messages.append(HumanMessage(content=st.session_state.user_input))
         with st.spinner(f"KJ-GPTがラベルを集めています（残りラベル数{number_of_items}） ..."):
             answer, cost = get_answer(llm_group, st.session_state.messages[-2:])
+
+            # answerのtoken数を計算
+            tiktoken_encoding = tiktoken.encoding_for_model(st.session_state["model_name"])
+            encoded = tiktoken_encoding.encode(answer)
+            token_count = len(encoded)
+
+            # answerのtoken数が上限（4069tokens）を超えた場合の処理
+            if token_count >= 4096:
+                # 直前のanswerをリスト化
+                answer_list = split_lines_to_list(answer)
+                # answerから「グループ：」や空要素を削除
+                cleaned_answer_list = [item for item in answer_list if not re.match(r'^グループ\d+:$', item) and item != '']
+
+                # 最初の元データリストからanswerでグループ分けされたものを除いたungrouped_listを作成
+                ungrouped_list = set(first_group_list) - set(cleaned_answer_list)
+
+                # ungrouped_listをstr型へ変換
+                ungrouped_data = "\n".join(ungrouped_list)
+
+                # グループ分けされていない残りラベルについて、再びグループ分け
+                st.session_state.messages.append(SystemMessage(content=prompt_ptrn))
+                st.session_state.messages.append(HumanMessage(content=ungrouped_data))
+                # 未グルーピングのデータ、systemプロンプト、グルーピング対象の全テータをapiに渡す
+                conti_answer, cost = get_answer(llm_group, st.session_state.messages[-3:])
+
+                # 最初のグループ分けとその続きのグループ分け結果を結合
+                answer += conti_answer
+        
         st.session_state.messages.append(AIMessage(content=answer))
         st.session_state.costs.append(cost)
 
