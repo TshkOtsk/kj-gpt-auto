@@ -792,6 +792,8 @@ def init_messages():
 
         st.session_state["model_name"] = ""
 
+        st.session_state["user_input_random"] = ""
+
         st.session_state["labeling_pair"] = ""
 
         st.session_state["edited_labeling_pair"] = []
@@ -1740,6 +1742,19 @@ def main():
         st.session_state["grouping_table"] = []
 
         first_group_list = split_lines_to_list(st.session_state.user_input)
+
+        print("first_group_list >>>", first_group_list)
+
+        user_input_random_order_list = random.sample(first_group_list, len(first_group_list))
+
+        print("user_input_random_order_list >>>", user_input_random_order_list)
+
+        user_input_random = "\n".join(user_input_random_order_list)
+
+        print("user_input_random >>>", user_input_random)
+
+        st.session_state["user_input_random"] = user_input_random
+
         number_of_first_items = len(first_group_list)
         labeling_pair = []
         dict = {}
@@ -1760,7 +1775,7 @@ def main():
             translated_theme = theme_translate(user_theme,st.session_state["openai_api_key"])
         prompt_ptrn = prompt_grouping(number_of_items, translated_theme)
         st.session_state.messages.append(SystemMessage(content=prompt_ptrn))
-        st.session_state.messages.append(HumanMessage(content=st.session_state.user_input))
+        st.session_state.messages.append(HumanMessage(content=st.session_state["user_input_random"]))
         with st.spinner(f"KJ-GPTがラベルを集めています（残りラベル数{number_of_items}） ..."):
             answer, cost = get_answer(llm_group, st.session_state.messages[-2:])
 
@@ -1868,7 +1883,15 @@ def main():
         for group in cleaned_group_list:    
             if isinstance(group, list) and len(group) >= 2:
 
-                group_string = "\n".join(group)
+                print("group >>>", group)
+
+                # 各ラベルから、「数字＋.」および「アルファベット＋数字＋.」のパターンを削除
+                cleaned_group_list = [re.sub(r'^[a-zA-Z]?\d+\.', '', text) for text in group]
+                print("cleaned_group_list >>>", cleaned_group_list)
+
+                group_string = "\n".join(cleaned_group_list)
+                print("group_string >>>", group_string)
+
 
                 # ラベル集めのプロンプト
                 prompt_ptrn = prompt_labeling(number_of_items,break_point,style)
