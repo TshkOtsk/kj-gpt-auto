@@ -2659,8 +2659,6 @@ def main():
                     # リスト化したBDAを逆順に並び替え
                     BDA_list_reversed = list(reversed(BDA_list))
 
-                    print(BDA_list_reversed)
-
                     # BDAごとの文章化に使うlast_messagesをリセット
                     last_messages = []
                     # BDAごとに文章化
