@@ -1,7 +1,7 @@
 from logging import basicConfig
 from urllib import response
 import streamlit as st
-from langchain.chat_models import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from langchain.schema import (
     SystemMessage,
     HumanMessage,
@@ -40,7 +40,7 @@ dt_now_formatted = dt_now.strftime("%Y%m%d_%H%M%S")
 
 def theme_translate(user_theme,openai_api_key):
     theme = "私が入力するのは、" + user_theme + "についてのデータです。"
-    llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-0613")
+    llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model_name=st.session_state["model_name"])
     translating_prompt = f"""
 Please translate the following Japanese sentence into English.
 {theme}
@@ -54,7 +54,7 @@ Please translate the following Japanese sentence into English.
     return translated_theme
 
 def eng_translates(text,openai_api_key):
-    llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-16k-0613")
+    llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model_name=st.session_state["model_name"])
     translating_prompt = f"""
 Please translate the following Japanese sentence into English.
 {text}
@@ -67,7 +67,7 @@ Please translate the following Japanese sentence into English.
     return translated_text
 
 def summarize(text,openai_api_key,style):
-    llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.7, model_name="gpt-4-1106-preview")
+    llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.7, model_name=st.session_state["model_name"])
 
     if style=="formal":
         translating_prompt = f"""
@@ -118,7 +118,7 @@ Please write in Japanese.
 
 def data_generating(user_theme,openai_api_key):
     theme = user_theme
-    llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model_name="gpt-3.5-turbo-0613")
+    llm = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model_name=st.session_state["model_name"])
     translating_prompt = f"""
 Please translate the following Japanese sentence into English.
 {theme}
@@ -821,15 +821,13 @@ def init_messages():
         st.session_state["summarized_data"] = ""
 
 def select_model(openai_api_key):
-    model = st.sidebar.radio("モデル:", ("GPT-3.5", "GPT-3.5-16k", "GPT-4", "GPT-4-Turbo"),index=3)
-    if model == "GPT-3.5":
-        model_name = "gpt-3.5-turbo-0613"
-    elif model == "GPT-3.5-16k":
+    model = st.sidebar.radio("モデル:", ("GPT-3.5-16k", "GPT-4o"),index=1)
+    if model == "GPT-3.5-16k":
         model_name = "gpt-3.5-turbo-16k-0613"
-    elif model == "GPT-4":
-        model_name = "gpt-4"
     else:
-        model_name = "gpt-4-1106-preview"
+        model_name = "gpt-4o-2024-05-13"
+
+    st.session_state["model_name"] = model_name
     
     # サイドバーにスライダーを追加し、temperatureを0から1までの範囲で選択可能にする
     # 初期値は0.0、刻み幅は0.1とする
@@ -1743,15 +1741,9 @@ def main():
 
         first_group_list = split_lines_to_list(st.session_state.user_input)
 
-        print("first_group_list >>>", first_group_list)
-
         user_input_random_order_list = random.sample(first_group_list, len(first_group_list))
 
-        print("user_input_random_order_list >>>", user_input_random_order_list)
-
         user_input_random = "\n".join(user_input_random_order_list)
-
-        print("user_input_random >>>", user_input_random)
 
         st.session_state["user_input_random"] = user_input_random
 
@@ -1766,7 +1758,7 @@ def main():
             number_of_items = number_of_first_items
 
         # ラベル集めのためのllmセッティング
-        model_name_grouping = "gpt-4-1106-preview"
+        model_name_grouping = st.session_state["model_name"]
         llm_group = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.3, model_name=model_name_grouping)
 
         # 項目数がbreak_pointより少なくなるまでラベル集めをループする
@@ -1883,21 +1875,16 @@ def main():
         for group in cleaned_group_list:    
             if isinstance(group, list) and len(group) >= 2:
 
-                print("group >>>", group)
-
                 # 各ラベルから、「数字＋.」および「アルファベット＋数字＋.」のパターンを削除
                 cleaned_group_list = [re.sub(r'^[a-zA-Z]?\d+\.', '', text) for text in group]
-                print("cleaned_group_list >>>", cleaned_group_list)
 
                 group_string = "\n".join(cleaned_group_list)
-                print("group_string >>>", group_string)
-
 
                 # ラベル集めのプロンプト
                 prompt_ptrn = prompt_labeling(number_of_items,break_point,style)
 
                 # 表札づくりのためのllmセッティング
-                llm_label = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.7, model_name="gpt-4-1106-preview")
+                llm_label = ChatOpenAI(openai_api_key=openai_api_key, temperature=0.7, model_name=st.session_state["model_name"])
 
                 st.session_state.messages.append(SystemMessage(content=prompt_ptrn))
                 st.session_state.messages.append(HumanMessage(content=group_string))
@@ -2772,7 +2759,7 @@ def main():
         #                         else:
         #                             wiki_extract = ""
         #                         # ヒントとなる詩のためのllmセッティング
-        #                         llm_poet = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model_name="gpt-4-1106-preview")
+        #                         llm_poet = ChatOpenAI(openai_api_key=openai_api_key, temperature=0, model_name=st.session_state["model_name"])
         #                         poet_answer = related_sentence_generating(llm_poet,item,data["text"],st.session_state["translated_theme"],wiki_extract)
         #                         st.markdown(f"### ・{wiki_title}")
         #                         if "thumbnail" in json_data:
