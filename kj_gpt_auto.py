@@ -1,7 +1,7 @@
 from logging import basicConfig
 from urllib import response
 import streamlit as st
-from langchain_community.chat_models import ChatOpenAI
+from langchain.chat_models import ChatOpenAI
 from langchain.schema import (
     SystemMessage,
     HumanMessage,
