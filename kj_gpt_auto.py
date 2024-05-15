@@ -28,6 +28,8 @@ import tiktoken
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 MIRO_API_KEY = os.environ.get("MIRO_API_KEY")
+if not MIRO_API_KEY:
+    MIRO_API_KEY = st.secrets.MIRO_API_KEY
 
 theme = ""
 prompt_ptrn = ""
