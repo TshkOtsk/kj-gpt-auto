@@ -2959,7 +2959,7 @@ def main():
 
     # コストの計算と表示
     costs = st.session_state.get('costs', [])
-    st.sidebar.markdown("## 料金")
+    st.sidebar.markdown("## 料金 *現在GPT-4oは非対応")
     st.sidebar.markdown(f"**合計金額: ${sum(costs):.5f}**")
     for cost in costs:
         st.sidebar.markdown(f"- ${cost:.5f}")
