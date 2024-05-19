@@ -749,8 +749,6 @@ Rephrase it with an adjective, verb or metaphor with creativity.
         prompt_ptrn = labeling2
     elif 0 < number_of_items < 13:
         prompt_ptrn = labeling3
-    # elif break_point < number_of_items < 13:
-    #     prompt_ptrn = labeling3
     else:
         prompt_ptrn = symbol
     return prompt_ptrn
@@ -823,17 +821,19 @@ def init_messages():
         st.session_state["summarized_data"] = ""
 
 def select_model(openai_api_key):
-    model = st.sidebar.radio("モデル:", ("GPT-3.5-16k", "GPT-4o"),index=1)
+    model = st.sidebar.radio("モデル:", ("GPT-3.5-16k", "GPT-4-Turbo", "GPT-4o"),index=2)
     if model == "GPT-3.5-16k":
         model_name = "gpt-3.5-turbo-16k-0613"
+    elif model == "GPT-4-Turbo":
+        model_name = "gpt-4-1106-preview"
     else:
         model_name = "gpt-4o-2024-05-13"
-
     st.session_state["model_name"] = model_name
     
     # サイドバーにスライダーを追加し、temperatureを0から1までの範囲で選択可能にする
     # 初期値は0.0、刻み幅は0.1とする
-    temperature = st.sidebar.slider("Temperature:", min_value=0.0, max_value=1.0, value=0.7, step=0.01)
+    # temperature = st.sidebar.slider("Temperature:", min_value=0.0, max_value=1.0, value=0.7, step=0.01)
+    temperature = 0.7
     
     return ChatOpenAI(openai_api_key=openai_api_key, temperature=temperature, model_name=model_name)
 
@@ -855,6 +855,10 @@ def split_lines_to_list(data):
 def get_list(data):
     # データを行ごとに分割
     lines = data.strip().split("\n")
+    # 各要素から "- " を削除
+    lines = [item.lstrip('- ') for item in lines]
+    # 各要素から 冒頭の数字 を削除
+    lines = [re.sub(r'^\d+\.\s*', '', item) for item in lines]
 
     result = []
     temp = []
@@ -879,6 +883,7 @@ def get_list(data):
             result.append(temp)
     # ""の空白要素を削除
     result = [item for item in result if item != ""]
+    
     return result
 
 def parse_dict_from_string(string):
@@ -1425,9 +1430,9 @@ Please write in a simple, easy-to-understand manner for junior high school stude
     simplyfied_group_list[0] = "**" + str(simplyfied_group_list[0]) + "**"
     st.table(simplyfied_group_list)
 
-    last_6_messages = st.session_state.messages[-6:]
+    last_3_messages = st.session_state.messages[-3:]
     ai_messages = []
-    for message in last_6_messages:
+    for message in last_3_messages:
         if isinstance(message, AIMessage):
             ai_messages.append(message)
     last_messages = ai_messages + st.session_state.messages[-2:]
@@ -1778,8 +1783,44 @@ def main():
             encoded = tiktoken_encoding.encode(answer)
             token_count = len(encoded)
 
+            # 直前のanswerをリスト化
+            answer_list = split_lines_to_list(answer)
+
+            # 入力と出力のグループ数を比較
+            # 入力のグループ数
+            input_data_len = len(first_group_list)
+            # 出力のグループ数
+            # "グループ:"の入った要素と空要素を削除
+            filtered_answer_list = [item for item in answer_list if not re.match(r'(^|#+\s*)グループ\d+:', item) and item != '']
+            output_data_len = len(filtered_answer_list)
+            if input_data_len != output_data_len:
+                print("最初のデータ数と出力の数が違います！")
+                # 重複を削除
+                unique_answer_list = list(dict.fromkeys(answer_list))
+                # "- "を削除
+                unique_answer_list = [item.lstrip('- ') for item in unique_answer_list]
+                # 冒頭の数字を削除
+                unique_answer_list = [re.sub(r'^\d+\.\s*', '', item) for item in unique_answer_list]
+                # 入力と出力のどちらか一方にだけ含まれるデータを抽出
+                generated_data_set = set(first_group_list) ^ set(unique_answer_list)
+                generated_data_list = list(generated_data_set)
+                # "グループ:"の入った要素と空要素を削除
+                generated_data_list = [item for item in generated_data_list if not re.match(r'(^|#+\s*)グループ\d+:', item) and item != '']
+                # generated_data_listから重複を削除
+                generated_data_list = list(set(generated_data_list))
+                print("generated_data_list >>>>>>>>>>", generated_data_list)
+                # どちらか一方にだけ含まれるデータを処理
+                for item in generated_data_list:
+                    if item in first_group_list: # 入力にも含まれているデータ（ラベル集めで漏れているデータ）を判断して追加
+                        unique_answer_list.append(f"単独：\n{item}")
+                    elif item not in first_group_list and item in unique_answer_list: # 入力には無くて出力のみに含まれているデータ（ラベル集めで混入したデータ）を判断して削除
+                        unique_answer_list.remove(item)
+                
+                answer = "\n".join(unique_answer_list)
+
             # answerのtoken数が上限（4069tokens）を超えた場合の処理
             if token_count >= 4096:
+
                 # 直前のanswerをリスト化
                 answer_list = split_lines_to_list(answer)
                 # answerから「グループ：」や空要素を削除
@@ -2959,7 +3000,7 @@ def main():
 
     # コストの計算と表示
     costs = st.session_state.get('costs', [])
-    st.sidebar.markdown("## 料金 \n#### *現在GPT-4oは非対応")
+    st.sidebar.markdown("## 料金 \n#### *現在GPT-4oは料金計算に非対応")
     st.sidebar.markdown(f"**合計金額: ${sum(costs):.5f}**")
     for cost in costs:
         st.sidebar.markdown(f"- ${cost:.5f}")
