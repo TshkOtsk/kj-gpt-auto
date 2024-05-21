@@ -1808,7 +1808,6 @@ def main():
                 generated_data_list = [item for item in generated_data_list if not re.match(r'(^|#+\s*)グループ\d+:', item) and item != '']
                 # generated_data_listから重複を削除
                 generated_data_list = list(set(generated_data_list))
-                print("generated_data_list >>>>>>>>>>", generated_data_list)
                 # どちらか一方にだけ含まれるデータを処理
                 for item in generated_data_list:
                     if item in first_group_list: # 入力にも含まれているデータ（ラベル集めで漏れているデータ）を判断して追加
@@ -1823,23 +1822,24 @@ def main():
 
                 # 直前のanswerをリスト化
                 answer_list = split_lines_to_list(answer)
-                # answerから「グループ：」や空要素を削除
-                cleaned_answer_list = [item for item in answer_list if not re.match(r'^グループ\d+:$', item) and item != '']
-
+                # answerから「グループ：」「単独：」や空要素を削除
+                cleaned_answer_list = [item for item in answer_list if not re.match(r'(^|#+\s*)グループ\d+:', item) and item != '']
+                cleaned_answer_list = [item for item in cleaned_answer_list if not re.match(r'^単独：', item)]
                 # 最初の元データリストからanswerでグループ分けされたものを除いたungrouped_listを作成
                 ungrouped_list = set(first_group_list) - set(cleaned_answer_list)
 
-                # ungrouped_listをstr型へ変換
-                ungrouped_data = "\n".join(ungrouped_list)
+                if ungrouped_list:
+                    # ungrouped_listをstr型へ変換
+                    ungrouped_data = "\n".join(ungrouped_list)
 
-                # グループ分けされていない残りラベルについて、再びグループ分け
-                st.session_state.messages.append(SystemMessage(content=prompt_ptrn))
-                st.session_state.messages.append(HumanMessage(content=ungrouped_data))
-                # 未グルーピングのデータ、systemプロンプトをapiに渡す
-                conti_answer, cost = get_answer(llm_group, st.session_state.messages[-2:])
+                    # グループ分けされていない残りラベルについて、再びグループ分け
+                    st.session_state.messages.append(SystemMessage(content=prompt_ptrn))
+                    st.session_state.messages.append(HumanMessage(content=ungrouped_data))
+                    # 未グルーピングのデータ、systemプロンプトをapiに渡す
+                    conti_answer, cost = get_answer(llm_group, st.session_state.messages[-2:])
 
-                # 最初のグループ分けとその続きのグループ分け結果を結合
-                answer += conti_answer
+                    # 最初のグループ分けとその続きのグループ分け結果を結合
+                    answer += conti_answer
         
         st.session_state.messages.append(AIMessage(content=answer))
         st.session_state.costs.append(cost)
