@@ -786,7 +786,7 @@ def init_messages():
 
         st.session_state.costs = []
 
-        st.session_state["openai_api_key"] = ""
+        # st.session_state["openai_api_key"] = ""
 
         st.session_state["miro_api_key"] = ""
 
